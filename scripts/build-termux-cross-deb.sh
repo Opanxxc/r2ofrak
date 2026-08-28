@@ -32,23 +32,23 @@ cp -r src/panxcz_tools "$STAGE$PREFIX/lib/python3.12/site-packages/"
 # ── 3. Create entry point scripts ────────────────────────────────
 PY_SITE="$PREFIX/lib/python3.12/site-packages"
 
-cat > "$STAGE$PREFIX/bin/panxcz-tools" << WRAPPER
+cat > "$STAGE$PREFIX/bin/panxcz" << WRAPPER
 #!/data/data/com.termux/files/usr/bin/env python3
 import sys, os
 sys.path.insert(0, '${PY_SITE}')
 from panxcz_tools.cli import main
 main()
 WRAPPER
-chmod 755 "$STAGE$PREFIX/bin/panxcz-tools"
+chmod 755 "$STAGE$PREFIX/bin/panxcz"
 
-cat > "$STAGE$PREFIX/bin/panxcz-tools-tui" << WRAPPER
+cat > "$STAGE$PREFIX/bin/panxcz-tui" << WRAPPER
 #!/data/data/com.termux/files/usr/bin/env python3
 import sys, os
 sys.path.insert(0, '${PY_SITE}')
 from panxcz_tools.tui import main
 main()
 WRAPPER
-chmod 755 "$STAGE$PREFIX/bin/panxcz-tools-tui"
+chmod 755 "$STAGE$PREFIX/bin/panxcz-tui"
 
 # ── 4. postinst (NO apt calls — deadlock!) ──────────────────────
 # NOTE: Do NOT call apt/pkg inside postinst — the parent apt install
@@ -56,12 +56,12 @@ chmod 755 "$STAGE$PREFIX/bin/panxcz-tools-tui"
 # Dependencies are handled by the Depends: field in control.
 cat > "$STAGE/DEBIAN/postinst" << 'POSTINST'
 #!/data/data/com.termux/files/usr/bin/env bash
-echo "[*] Setting up panxcz-tools..."
+echo "[*] Setting up panxcz..."
 # Only pip install Python-only deps (no apt lock conflict)
 pip install --no-cache-dir textual rich r2pipe 2>/dev/null || \
     pip3 install --no-cache-dir textual rich r2pipe 2>/dev/null || true
-echo "[+] panxcz-tools ready!"
-echo "    Run: panxcz-tools-tui <binary>"
+echo "[+] panxcz ready!"
+echo "    Run: panxcz-tui <binary>"
 POSTINST
 chmod 755 "$STAGE/DEBIAN/postinst"
 

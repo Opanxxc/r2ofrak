@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-#  R2OFRAK .AppImage builder
+#  Panxcz Tools portable builder
 #  Creates a portable package with Python + panxcz-tools
 # ============================================================
 set -euo pipefail
@@ -8,7 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 APP_VERSION="${DEB_VERSION:-0.2.0}"
-APP_NAME="R2OFRAK"
+APP_NAME="PanxczTools"
 
 echo "============================================"
 echo "  Building ${APP_NAME} package v${APP_VERSION}"
@@ -35,7 +35,7 @@ cp -r src/panxcz_tools "$APPDIR/usr/lib/python3/dist-packages/"
 # ── 3. Create launcher script ─────────────────────────────────────
 cat > "$APPDIR/usr/bin/panxcz-tools-launcher" << 'LAUNCHER'
 #!/usr/bin/env python3
-"""R2OFRAK AppImage launcher."""
+"""Panxcz Tools AppImage launcher."""
 import sys, os
 
 APPDIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,15 +44,23 @@ sys.path.insert(0, os.path.join(APPDIR, "usr/lib/python3/dist-packages"))
 # Parse args
 target = None
 cli_mode = False
+gui_mode = False
 args = sys.argv[1:]
 if "--cli" in args:
     cli_mode = True
     args.remove("--cli")
-if args:
+if "--gui" in args:
+    gui_mode = True
+    args.remove("--gui")
+if args and not args[0].startswith("-"):
     target = args[0]
 
 if cli_mode:
     from panxcz_tools.cli import main
+    sys.argv = [sys.argv[0]] + args
+    main()
+elif gui_mode:
+    from panxcz_tools.gui.app import main
     sys.argv = [sys.argv[0]] + args
     main()
 else:
@@ -69,7 +77,7 @@ ln -sf usr/bin/panxcz-tools-launcher "$APPDIR/AppRun"
 cat > "$APPDIR/panxcz-tools.desktop" << EOF
 [Desktop Entry]
 Type=Application
-Name=R2OFRAK
+Name=Panxcz Tools
 GenericName=Reverse Engineering Tool
 Comment=Unified reverse engineering platform (radare2 + OFRAK)
 Exec=panxcz-tools-launcher %f
@@ -92,26 +100,27 @@ cat > "$APPDIR/panxcz-tools.svg" << 'SVG'
 SVG
 
 # ── 6. Create portable tar.gz (universal format) ──────────────────
+TARBALL="${REPO_DIR}/${APP_NAME}-${APP_VERSION}-x86_64.tar.gz"
 cd /tmp
-TARBALL="${APP_NAME}-${APP_VERSION}-x86_64.tar.gz"
 tar czf "$TARBALL" -C /tmp "${APP_NAME}.AppDir"
 
 # ── 7. Also create a .run self-extracting script ──────────────────
-cat > "/tmp/${APP_NAME}-${APP_VERSION}-x86_64.AppImage" << 'RUNSCRIPT'
+APPIMAGE="${REPO_DIR}/${APP_NAME}-${APP_VERSION}-x86_64.AppImage"
+cat > "$APPIMAGE" << 'RUNSCRIPT'
 #!/usr/bin/env bash
-# R2OFRAK AppImage (self-extracting)
+# Panxcz Tools AppImage (self-extracting)
 set -e
 TMPDIR=$(mktemp -d)
 ARCHIVE=$(awk 'BEGIN{lines=0} /^__ARCHIVE__$/{exit} {lines++} END{print NR}' "$0")
 tail -n +$((ARCHIVE+1)) "$0" | tar xzf - -C "$TMPDIR"
-exec "$TMPDIR/${APP_NAME}.AppDir/AppRun" "$@"
+exec "$TMPDIR/PanxczTools.AppDir/AppRun" "$@"
 __ARCHIVE__
 RUNSCRIPT
 
 # Append the tarball
-cat "/tmp/$TARBALL" >> "/tmp/${APP_NAME}-${APP_VERSION}-x86_64.AppImage"
-chmod +x "/tmp/${APP_NAME}-${APP_VERSION}-x86_64.AppImage"
+cat "$TARBALL" >> "$APPIMAGE"
+chmod +x "$APPIMAGE"
 
 echo ""
-ls -lh /tmp/${APP_NAME}-${APP_VERSION}-x86_64.*
-echo "[+] AppImage + tar.gz built successfully!"
+ls -lh "${REPO_DIR}/${APP_NAME}-${APP_VERSION}-x86_64."*
+echo "[+] AppImage + tar.gz built!"
