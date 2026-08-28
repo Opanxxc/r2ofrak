@@ -359,10 +359,7 @@ Examples:
     p.add_argument("target", nargs="?")
     p.set_defaults(func=cmd_tui)
 
-    # Disasm-specific
-    for p_action in [sp for sp in sub._group_actions if hasattr(sp, '_parser_class')]:
-        pass
-    # Add disasm args
+    # Disasm-specific args
     sub.choices["disasm"].add_argument("--mode", choices=["full", "function", "addr", "range"], default="full")
     sub.choices["disasm"].add_argument("--addr", help="Address")
     sub.choices["disasm"].add_argument("--count", type=int, default=100)

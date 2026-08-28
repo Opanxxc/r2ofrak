@@ -17,7 +17,7 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.12"
-  DEB_VERSION: "0.1.0"
+  DEB_VERSION: "0.2.0"
 
 jobs:
   # ─── Desktop .deb (amd64) ──────────────────────────────────────────────
