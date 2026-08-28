@@ -26,7 +26,7 @@ pkg install -y python python-pip git radare2 dpkg 2>/dev/null || \
     apt-get install -y python python-pip git radare2 dpkg 2>/dev/null || true
 
 # Find and install the .deb
-DEB=$(find /work /data/data/com.termux/files/home -maxdepth 2 -name "r2ofrak_*_aarch64.deb" 2>/dev/null | head -1)
+DEB=$(find /work /data/data/com.termux/files/home -maxdepth 2 -name "panxcz-tools_*_aarch64.deb" 2>/dev/null | head -1)
 if [ -z "$DEB" ]; then
     DEB=$(find /work /data/data/com.termux/files/home -maxdepth 2 -name "*.deb" 2>/dev/null | head -1)
 fi
@@ -34,7 +34,7 @@ fi
 if [ -z "$DEB" ]; then
     bad "No .deb found in /work or ~"
     echo "  Files in /work: $(ls /work/*.deb 2>/dev/null || echo 'none')"
-    echo "  Files in ~: $(ls ~/r2ofrak_*_aarch64.deb 2>/dev/null || echo 'none')"
+    echo "  Files in ~: $(ls ~/panxcz-tools_*_aarch64.deb 2>/dev/null || echo 'none')"
     exit 1
 fi
 
@@ -48,23 +48,23 @@ apt install -y "$DEB" 2>/dev/null || dpkg --force-all -i "$DEB" 2>/dev/null || {
 echo ""
 echo "=== Core Tests ==="
 
-check "r2ofrak binary in PATH" \
-    "command -v r2ofrak"
+check "panxcz-tools binary in PATH" \
+    "command -v panxcz-tools"
 
-check "r2ofrak-tui binary in PATH" \
-    "command -v r2ofrak-tui"
+check "panxcz-tools-tui binary in PATH" \
+    "command -v panxcz-tools-tui"
 
-check "python can import r2ofrak" \
-    "python3 -c 'import r2ofrak; print(r2ofrak.__version__)'"
+check "python can import panxcz_tools" \
+    "python3 -c 'import panxcz_tools; print(panxcz-tools.__version__)'"
 
-check "r2ofrak --version works" \
-    "r2ofrak --version"
+check "panxcz-tools --version works" \
+    "panxcz-tools --version"
 
-check "r2ofrak --help works" \
-    "r2ofrak --help"
+check "panxcz-tools --help works" \
+    "panxcz-tools --help"
 
-check "r2ofrak-tui --help works" \
-    "r2ofrak-tui --help"
+check "panxcz-tools-tui --help works" \
+    "panxcz-tools-tui --help"
 
 check "radare2 binary available" \
     "command -v r2"
@@ -74,22 +74,22 @@ echo "=== CLI Tests ==="
 
 # Test analyze on a binary
 if [ -f "$PREFIX/bin/ls" ]; then
-    check "r2ofrak analyze works" \
-        "r2ofrak analyze '$PREFIX/bin/ls' --json 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); assert \"file\" in d'"
+    check "panxcz-tools analyze works" \
+        "panxcz-tools analyze '$PREFIX/bin/ls' --json 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); assert \"file\" in d'"
 else
     warn "Skipping analyze test (no /bin/ls)"
 fi
 
 if [ -f "$PREFIX/bin/ls" ]; then
-    check "r2ofrak strings works" \
-        "r2ofrak strings '$PREFIX/bin/ls' --json 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); assert isinstance(d, list)'"
+    check "panxcz-tools strings works" \
+        "panxcz-tools strings '$PREFIX/bin/ls' --json 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); assert isinstance(d, list)'"
 else
     warn "Skipping strings test"
 fi
 
 if [ -f "$PREFIX/bin/ls" ]; then
-    check "r2ofrak imports works" \
-        "r2ofrak imports '$PREFIX/bin/ls' --json 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); assert isinstance(d, list)'"
+    check "panxcz-tools imports works" \
+        "panxcz-tools imports '$PREFIX/bin/ls' --json 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); assert isinstance(d, list)'"
 else
     warn "Skipping imports test"
 fi
@@ -97,11 +97,11 @@ fi
 echo ""
 echo "=== Extended Tests (warnings if fail) ==="
 
-check "r2ofrak functions works" \
-    "r2ofrak functions '$PREFIX/bin/ls' --json 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); assert isinstance(d, list)'" || true
+check "panxcz-tools functions works" \
+    "panxcz-tools functions '$PREFIX/bin/ls' --json 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); assert isinstance(d, list)'" || true
 
-check "r2ofrak entropy works" \
-    "r2ofrak entropy '$PREFIX/bin/ls' 2>/dev/null" || true
+check "panxcz-tools entropy works" \
+    "panxcz-tools entropy '$PREFIX/bin/ls' 2>/dev/null" || true
 
 echo ""
 echo "============================================"

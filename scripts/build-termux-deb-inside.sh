@@ -7,7 +7,7 @@
 set -euo pipefail
 
 DEB_VERSION="${DEB_VERSION:-0.2.0}"
-PKG_NAME="r2ofrak"
+PKG_NAME="panxcz-tools"
 PREFIX="/data/data/com.termux/files/usr"
 PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3.12")
 
@@ -25,7 +25,7 @@ apt-get install -y python python-pip build-essential cmake ninja \
     git radare2 dpkg fakeroot libffi openssl 2>/dev/null || true
 
 # ── 2. Copy source to writable location ───────────────────────────
-WORK="$HOME/r2ofrak-build"
+WORK="$HOME/panxcz-tools-build"
 rm -rf "$WORK"
 mkdir -p "$WORK"
 cp -r /work/. "$WORK/" 2>/dev/null || cp -r /work/* "$WORK/" 2>/dev/null || true
@@ -37,11 +37,11 @@ pip install --no-cache-dir . 2>/dev/null || {
     echo "[*] Fallback: manual install..."
     pip install --no-cache-dir textual rich r2pipe 2>/dev/null || true
     mkdir -p "$PREFIX/lib/python${PYVER}/site-packages"
-    cp -r src/r2ofrak "$PREFIX/lib/python${PYVER}/site-packages/"
+    cp -r src/panxcz_tools "$PREFIX/lib/python${PYVER}/site-packages/"
 }
 
 # Verify
-python3 -c "import r2ofrak; print(f'R2OFRAK v{r2ofrak.__version__} imported OK')" 2>/dev/null || \
+python3 -c "import panxcz_tools; print(f'R2OFRAK v{panxcz-tools.__version__} imported OK')" 2>/dev/null || \
     echo "[!] Import check failed (non-fatal)"
 
 # ── 4. Check r2 ───────────────────────────────────────────────────
@@ -50,39 +50,39 @@ which r2 >/dev/null 2>&1 && echo "[+] radare2: $(r2 -v 2>&1 | head -1)" || \
 
 # ── 5. Create .deb ────────────────────────────────────────────────
 echo "[*] Building .deb package..."
-STAGE="$HOME/r2ofrak-deb"
+STAGE="$HOME/panxcz-tools-deb"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN"
 mkdir -p "$STAGE/usr/bin"
 
 # Copy installed package files
 PY_SITE="$PREFIX/lib/python${PYVER}/site-packages"
-if [ -d "$PY_SITE/r2ofrak" ]; then
+if [ -d "$PY_SITE/panxcz-tools" ]; then
     mkdir -p "$STAGE$PY_SITE"
-    cp -r "$PY_SITE/r2ofrak" "$STAGE$PY_SITE/"
+    cp -r "$PY_SITE/panxcz-tools" "$STAGE$PY_SITE/"
 else
     mkdir -p "$STAGE$PY_SITE"
-    cp -r "$WORK/src/r2ofrak" "$STAGE$PY_SITE/"
+    cp -r "$WORK/src/panxcz-tools" "$STAGE$PY_SITE/"
 fi
 
 # Create entry points
-cat > "$STAGE/usr/bin/r2ofrak" << WRAPPER
+cat > "$STAGE/usr/bin/panxcz-tools" << WRAPPER
 #!/usr/bin/env python3
 import sys, os
 sys.path.insert(0, '$PY_SITE')
-from r2ofrak.cli import main
+from panxcz_tools.cli import main
 main()
 WRAPPER
-chmod 755 "$STAGE/usr/bin/r2ofrak"
+chmod 755 "$STAGE/usr/bin/panxcz-tools"
 
-cat > "$STAGE/usr/bin/r2ofrak-tui" << WRAPPER
+cat > "$STAGE/usr/bin/panxcz-tools-tui" << WRAPPER
 #!/usr/bin/env python3
 import sys, os
 sys.path.insert(0, '$PY_SITE')
-from r2ofrak.tui import main
+from panxcz_tools.tui import main
 main()
 WRAPPER
-chmod 755 "$STAGE/usr/bin/r2ofrak-tui"
+chmod 755 "$STAGE/usr/bin/panxcz-tools-tui"
 
 # Control
 cat > "$STAGE/DEBIAN/control" << EOF
@@ -93,10 +93,10 @@ Priority: optional
 Architecture: aarch64
 Maintainer: Opanxxc <opanxxc@users.noreply.github.com>
 Depends: python (>= 3.9), python-pip, radare2, libffi, openssl
-Homepage: https://github.com/Opanxxc/r2ofrak
+Homepage: https://github.com/Opanxxc/panxcz-tools
 Description: R2OFRAK - Unified Reverse Engineering for Termux
  Combines radare2 + OFRAK into one tool for Android/Termux.
- Run 'r2ofrak-tui' for interactive mode.
+ Run 'panxcz-tools-tui' for interactive mode.
 EOF
 
 # Build

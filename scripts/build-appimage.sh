@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 #  R2OFRAK .AppImage builder
-#  Creates a portable package with Python + r2ofrak
+#  Creates a portable package with Python + panxcz-tools
 # ============================================================
 set -euo pipefail
 
@@ -30,10 +30,10 @@ pip install --target="$APPDIR/usr/lib/python3/dist-packages" \
     textual rich r2pipe 2>/dev/null || true
 
 # Copy source
-cp -r src/r2ofrak "$APPDIR/usr/lib/python3/dist-packages/"
+cp -r src/panxcz_tools "$APPDIR/usr/lib/python3/dist-packages/"
 
 # ── 3. Create launcher script ─────────────────────────────────────
-cat > "$APPDIR/usr/bin/r2ofrak-launcher" << 'LAUNCHER'
+cat > "$APPDIR/usr/bin/panxcz-tools-launcher" << 'LAUNCHER'
 #!/usr/bin/env python3
 """R2OFRAK AppImage launcher."""
 import sys, os
@@ -52,35 +52,35 @@ if args:
     target = args[0]
 
 if cli_mode:
-    from r2ofrak.cli import main
+    from panxcz_tools.cli import main
     sys.argv = [sys.argv[0]] + args
     main()
 else:
-    from r2ofrak.tui import R2OFRAKApp
+    from panxcz_tools.tui import R2OFRAKApp
     app = R2OFRAKApp(target=target)
     app.run()
 LAUNCHER
-chmod 755 "$APPDIR/usr/bin/r2ofrak-launcher"
+chmod 755 "$APPDIR/usr/bin/panxcz-tools-launcher"
 
 # Symlink for AppRun
-ln -sf usr/bin/r2ofrak-launcher "$APPDIR/AppRun"
+ln -sf usr/bin/panxcz-tools-launcher "$APPDIR/AppRun"
 
 # ── 4. Desktop entry ──────────────────────────────────────────────
-cat > "$APPDIR/r2ofrak.desktop" << EOF
+cat > "$APPDIR/panxcz-tools.desktop" << EOF
 [Desktop Entry]
 Type=Application
 Name=R2OFRAK
 GenericName=Reverse Engineering Tool
 Comment=Unified reverse engineering platform (radare2 + OFRAK)
-Exec=r2ofrak-launcher %f
-Icon=r2ofrak
+Exec=panxcz-tools-launcher %f
+Icon=panxcz-tools
 Terminal=true
 Categories=Development;Security;Utility;
 MimeType=application/x-executable;application/x-sharedlib;application/x-object;
 EOF
 
 # ── 5. Icon ───────────────────────────────────────────────────────
-cat > "$APPDIR/r2ofrak.svg" << 'SVG'
+cat > "$APPDIR/panxcz-tools.svg" << 'SVG'
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
   <rect width="256" height="256" rx="32" fill="#1a1a2e"/>

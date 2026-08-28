@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panxcz Tools — Reverse Engineering Platform</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+</head>
+<body>
+
+<!-- Top Bar -->
+<header id="topbar">
+  <div class="logo">🔬 <span>Panxcz Tools</span> <small>v1.0</small></div>
+  <div class="file-controls">
+    <button onclick="openFile()" class="btn btn-primary">📂 Open Binary</button>
+    <span id="filename" class="filename">No file loaded</span>
+  </div>
+  <div class="actions">
+    <button onclick="runAnalysis()" class="btn">⚡ Analyze</button>
+    <button onclick="showTab('terminal')" class="btn">⌨ Terminal</button>
+  </div>
+</header>
+
+<!-- Main Layout -->
+<div id="app">
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-section">
+      <h3>📋 File Info</h3>
+      <div id="file-info" class="info-grid">
+        <div class="info-placeholder">Open a file to start</div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <h3>📊 Functions</h3>
+      <input type="text" id="func-search" placeholder="Search functions…" oninput="filterFunctions()">
+      <div id="func-list" class="list-panel"></div>
+    </div>
+    <div class="sidebar-section">
+      <h3>📥 Imports</h3>
+      <div id="import-list" class="list-panel"></div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main id="content">
+    <!-- Tab Bar -->
+    <nav id="tabbar">
+      <button class="tab active" onclick="showTab('disasm')">Disassembly</button>
+      <button class="tab" onclick="showTab('hex')">Hex</button>
+      <button class="tab" onclick="showTab('strings')">Strings</button>
+      <button class="tab" onclick="showTab('sections')">Sections</button>
+      <button class="tab" onclick="showTab('security')">Security</button>
+      <button class="tab" onclick="showTab('vulns')">Vulnerabilities</button>
+      <button class="tab" onclick="showTab('patch')">Patch</button>
+      <button class="tab" onclick="showTab('terminal')">Terminal</button>
+    </nav>
+
+    <!-- Panels -->
+    <div id="panel-disasm" class="panel active">
+      <div class="panel-toolbar">
+        <input type="text" id="disasm-addr" placeholder="Address (e.g. 0x00400000)">
+        <button onclick="disassemble()" class="btn btn-sm">Go</button>
+        <button onclick="disasmEntry()" class="btn btn-sm">Entry Point</button>
+        <button onclick="disasmMain()" class="btn btn-sm">main()</button>
+      </div>
+      <pre id="disasm-output" class="code-view">Click "Analyze" or open a file to see disassembly</pre>
+    </div>
+
+    <div id="panel-hex" class="panel">
+      <div class="panel-toolbar">
+        <input type="number" id="hex-offset" value="0" min="0" step="16">
+        <button onclick="loadHex()" class="btn btn-sm">Go</button>
+        <input type="text" id="hex-search" placeholder="Search hex/ASCII…">
+        <button onclick="searchHex()" class="btn btn-sm">Search</button>
+      </div>
+      <pre id="hex-output" class="code-view hex-view">Loading…</pre>
+    </div>
+
+    <div id="panel-strings" class="panel">
+      <div class="panel-toolbar">
+        <input type="number" id="strings-min" value="4" min="1" max="100">
+        <button onclick="loadStrings()" class="btn btn-sm">Load</button>
+        <input type="text" id="strings-filter" placeholder="Filter…" oninput="filterStrings()">
+      </div>
+      <table id="strings-table" class="data-table">
+        <thead><tr><th>Offset</th><th>Type</th><th>String</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="panel-sections" class="panel">
+      <table id="sections-table" class="data-table">
+        <thead><tr><th>Name</th><th>Address</th><th>Size</th><th>Entropy</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="panel-security" class="panel">
+      <div id="security-output" class="info-grid">Click "Analyze" to run security scan</div>
+    </div>
+
+    <div id="panel-vulns" class="panel">
+      <table id="vulns-table" class="data-table">
+        <thead><tr><th>Severity</th><th>Type</th><th>Description</th><th>Address</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="panel-patch" class="panel">
+      <div class="patch-form">
+        <h3>🔧 Binary Patching</h3>
+        <label>Offset (hex):</label>
+        <input type="text" id="patch-offset" placeholder="0x00001000">
+        <label>Hex Data:</label>
+        <input type="text" id="patch-hex" placeholder="90909090">
+        <button onclick="applyPatch()" class="btn btn-primary">Apply Patch</button>
+        <div id="patch-status"></div>
+      </div>
+    </div>
+
+    <div id="panel-terminal" class="panel">
+      <div class="terminal-container">
+        <div id="terminal-output" class="terminal-output"></div>
+        <div class="terminal-input-row">
+          <span class="prompt">$</span>
+          <input type="text" id="terminal-input" placeholder="Type r2 command…"
+                 onkeydown="if(event.key==='Enter')execR2Cmd()">
+          <button onclick="execR2Cmd()" class="btn btn-sm">Run</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Status Bar -->
+<footer id="statusbar">
+  <span id="status-left">Ready</span>
+  <span id="status-right">radare2 + OFRAK</span>
+</footer>
+
+<!-- Open File Modal -->
+<div id="open-modal" class="modal" style="display:none">
+  <div class="modal-content">
+    <h3>📂 Open Binary</h3>
+    <input type="text" id="open-path" placeholder="/path/to/binary">
+    <div class="modal-actions">
+      <button onclick="confirmOpen()" class="btn btn-primary">Open</button>
+      <button onclick="closeModal()" class="btn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

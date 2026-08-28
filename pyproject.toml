@@ -3,42 +3,33 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
-name = "r2ofrak"
-version = "0.2.0"
-description = "Unified Reverse Engineering Platform — radare2 + OFRAK combined"
+name = "panxcz-tools"
+version = "1.0.0"
+description = "Panxcz Tools — Unified Reverse Engineering Platform (radare2 + OFRAK + Web GUI)"
 readme = "README.md"
 license = {text = "AGPL-3.0"}
 requires-python = ">=3.9"
 authors = [
-    {name = "Opanxxc"},
+    {name = "Panxcz"},
 ]
-keywords = ["reverse-engineering", "radare2", "ofrak", "binary-analysis", "disassembly", "unpacking", "tui"]
+keywords = ["reverse-engineering", "radare2", "ofrak", "binary-analysis", "disassembly", "gui", "tui"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "Intended Audience :: Information Technology",
     "License :: OSI Approved :: GNU Affero General Public License v3",
-    "Operating System :: POSIX",
-    "Operating System :: MacOS",
-    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Security",
     "Topic :: Software Development :: Disassemblers",
-    "Topic :: Software Development :: Debuggers",
     "Environment :: Console",
-    "Environment :: Console :: Curses",
+    "Environment :: Web Environment",
 ]
 
 dependencies = [
     "r2pipe>=1.8.0",
     "textual>=0.40.0",
     "rich>=13.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
 ]
 
 [project.optional-dependencies]
@@ -46,25 +37,23 @@ full = [
     "r2pipe>=1.8.0",
     "textual>=0.40.0",
     "rich>=13.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
     "ofrak>=3.0.0",
 ]
-dev = [
-    "pytest>=7.0",
-    "ruff",
-    "mypy",
-]
+dev = ["pytest", "ruff"]
 
 [project.scripts]
-r2ofrak = "r2ofrak.cli:main"
-r2ofrak-tui = "r2ofrak.tui:main"
+panxcz = "panxcz_tools.cli:main"
+panxcz-gui = "panxcz_tools.gui.app:main"
+panxcz-tui = "panxcz_tools.tui:main"
 
 [project.urls]
-Homepage = "https://github.com/Opanxxc/r2ofrak"
-Repository = "https://github.com/Opanxxc/r2ofrak"
-Issues = "https://github.com/Opanxxc/r2ofrak/issues"
+Homepage = "https://github.com/Opanxxc/panxcz-tools"
+Repository = "https://github.com/Opanxxc/panxcz-tools"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.ruff]
-line-length = 100
+[tool.setuptools.package-data]
+"panxcz_tools.gui" = ["templates/*.html", "static/**/*.css", "static/**/*.js"]
