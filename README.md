@@ -2,7 +2,7 @@
 
 **Unified Reverse Engineering Platform — radare2 + OFRAK + Web GUI**
 
-[![Build](https://github.com/Opanxxc/panxcz-tools/actions/workflows/build-packages.yml/badge.svg)](https://github.com/Opanxxc/panxcz-tools/actions)
+[![Build](https://github.com/Opanxxc/r2ofrak/actions/workflows/build-packages.yml/badge.svg)](https://github.com/Opanxxc/r2ofrak/actions)
 
 <p align="center">
   <b>Web GUI • TUI • CLI — Analyze, Disassemble, Patch, Unpack, Security Scan</b>
@@ -37,9 +37,17 @@ panxcz-gui /path/to/binary
 
 ### Termux (Android)
 ```bash
+# One-liner install
+pkg install -y git radare2 && \
+  wget -qO /tmp/panxcz.deb https://github.com/Opanxxc/r2ofrak/releases/download/continuous/panxcz-tools_1.0.0_all.deb && \
+  apt install -y /tmp/panxcz.deb && \
+  panxcz-tui
+
+# Or install manually
 pkg install git radare2
-apt install ./panxcz-tools_1.0.0_all.deb
-panxcz-gui /path/to/binary
+wget https://github.com/Opanxxc/r2ofrak/releases/download/continuous/panxcz-tools_1.0.0_all.deb
+apt install -y ./panxcz-tools_1.0.0_all.deb
+panxcz-tui /path/to/binary
 ```
 
 ### TUI
