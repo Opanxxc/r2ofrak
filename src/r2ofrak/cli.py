@@ -1,313 +1,257 @@
 #!/usr/bin/env python3
 """
-R2OFRAK CLI — Unified reverse engineering tool.
-Combines radare2 + OFRAK into one powerful command.
+R2OFRAK CLI v0.2 — Powerful command-line reverse engineering.
 """
 
 import argparse
 import json
 import sys
-import os
 from pathlib import Path
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
+
+def _pp(data, use_json=False):
+    if use_json:
+        print(json.dumps(data, indent=2, default=str))
+    elif isinstance(data, dict):
+        for k, v in data.items():
+            if isinstance(v, list):
+                print(f"  {k}: {len(v)} items")
+                for item in v[:5]:
+                    print(f"    - {item}")
+            elif isinstance(v, dict):
+                print(f"  {k}:")
+                for kk, vv in v.items():
+                    print(f"    {kk}: {vv}")
+            else:
+                print(f"  {k}: {v}")
+    elif isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                print(json.dumps(item, default=str))
+            else:
+                print(item)
+
+
+# ─── Commands ──────────────────────────────────────────────────────
 
 def cmd_analyze(args):
-    """Full analysis of binary."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
         report = ctx.analyze()
-        
         if args.json:
             print(json.dumps(report, indent=2, default=str))
         else:
             print(f"\n{'='*60}")
-            print(f"  R2OFRAK Analysis Report")
+            print(f"  R2OFRAK Analysis — {Path(args.target).name}")
             print(f"{'='*60}")
-            print(f"  File: {report.get('file', 'N/A')}")
-            print(f"  Size: {report.get('size', 0):,} bytes")
-            
-            r2 = report.get("r2", {})
-            if "error" not in r2:
-                fi = r2.get("file_info", {})
-                print(f"\n  radare2:")
-                print(f"    Type: {fi.get('core', {}).get('file', 'N/A')}")
-                print(f"    Arch: {fi.get('bin', {}).get('arch', 'N/A')}")
-                print(f"    Bits: {fi.get('bin', {}).get('bits', 'N/A')}")
-                print(f"    OS:   {fi.get('bin', {}).get('os', 'N/A')}")
-                print(f"    Functions: {r2.get('functions', 0)}")
-                print(f"    Imports:   {r2.get('imports', 0)}")
-                print(f"    Exports:   {r2.get('exports', 0)}")
-                print(f"    Strings:   {r2.get('strings', 0)}")
-            
-            ofrak = report.get("ofrak", {})
-            if "error" not in ofrak:
-                print(f"\n  OFRAK:")
-                print(f"    Format: {ofrak.get('format', 'N/A')}")
-                print(f"    Tags:   {ofrak.get('tags', [])}")
-            
-            strings = report.get("strings", {})
-            print(f"\n  Strings: {strings.get('count', 0)} found")
-            
+            _pp(report, args.json)
             print(f"\n  Output: {ctx.output_dir}")
-            print(f"{'='*60}\n")
 
 
-def cmd_disassemble(args):
-    """Disassemble binary."""
+def cmd_disasm(args):
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        output = ctx.disassemble(
-            mode=args.mode,
-            addr=args.addr,
-            count=args.count,
-        )
-        print(output)
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        out = ctx.disassemble(mode=args.mode, addr=args.addr, count=args.count)
+        print(out)
 
 
 def cmd_strings(args):
-    """Extract strings."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
         strings = ctx.dump_strings(min_length=args.min_length)
-        
         if args.json:
             print(json.dumps(strings, indent=2))
         else:
             for s in strings:
-                offset = s.get("offset", "?")
-                string = s.get("string", "")
-                print(f"[{offset}] {string}")
+                print(f"[{s.get('offset','?')}] {s.get('string','')}")
 
 
 def cmd_imports(args):
-    """List imports."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        imports = ctx.dump_imports()
-        
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        data = ctx.dump_imports()
         if args.json:
-            print(json.dumps(imports, indent=2))
+            print(json.dumps(data, indent=2))
         else:
-            for imp in imports:
+            for imp in data:
                 if isinstance(imp, dict):
-                    name = imp.get("name", "?")
-                    addr = imp.get("plt", imp.get("addr", "?"))
-                    print(f"[{addr}] {name}")
+                    print(f"[{imp.get('plt', imp.get('addr', '?'))}] {imp.get('name', '?')}")
 
 
 def cmd_exports(args):
-    """List exports."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        exports = ctx.dump_exports()
-        
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        data = ctx.dump_exports()
         if args.json:
-            print(json.dumps(exports, indent=2))
+            print(json.dumps(data, indent=2))
         else:
-            for exp in exports:
+            for exp in data:
                 if isinstance(exp, dict):
-                    name = exp.get("name", "?")
-                    addr = exp.get("paddr", exp.get("vaddr", "?"))
-                    print(f"[{addr}] {name}")
+                    print(f"[{exp.get('paddr', exp.get('vaddr', '?'))}] {exp.get('name', '?')}")
 
 
 def cmd_functions(args):
-    """List functions."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        funcs = ctx.dump_functions()
-        
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        data = ctx.dump_functions()
         if args.json:
-            print(json.dumps(funcs, indent=2))
+            print(json.dumps(data, indent=2))
         else:
-            for f in funcs:
+            for f in data:
                 if isinstance(f, dict):
-                    name = f.get("name", "?")
-                    offset = f.get("offset", f.get("addr", "?"))
-                    size = f.get("size", 0)
-                    print(f"[{offset}] {name} (size: {size})")
+                    print(f"[{f.get('offset', f.get('addr', '?'))}] {f.get('name', '?')} (size: {f.get('size', 0)})")
 
 
 def cmd_segments(args):
-    """List segments/sections."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        segs = ctx.extract_segments()
-        
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        data = ctx.extract_segments()
         if args.json:
-            print(json.dumps(segs, indent=2))
+            print(json.dumps(data, indent=2))
         else:
-            for seg in segs:
-                if isinstance(seg, dict):
-                    name = seg.get("name", "?")
-                    addr = seg.get("vaddr", "?")
-                    size = seg.get("size", 0)
-                    perm = seg.get("perm", "?")
-                    print(f"[{addr}] {name} (size: {size}, perm: {perm})")
+            for s in data:
+                if isinstance(s, dict):
+                    print(f"[{s.get('vaddr', '?')}] {s.get('name', '?')} (size: {s.get('size', 0)}, perm: {s.get('perm', '?')})")
 
 
 def cmd_entropy(args):
-    """Entropy analysis."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        entropy = ctx.entropy_analysis()
-        
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        data = ctx.entropy_analysis()
         if args.json:
-            print(json.dumps(entropy, indent=2))
+            print(json.dumps(data, indent=2))
         else:
-            for e in entropy:
-                name = e.get("name", "?")
+            for e in data:
                 ent = e.get("entropy", 0)
-                size = e.get("size", 0)
                 bar = "█" * int(ent * 5)
-                print(f"[{name:20s}] entropy={ent:.2f} size={size:8d} {bar}")
+                print(f"[{e.get('name','?'):20s}] {ent:.2f} {bar}")
 
 
 def cmd_vulns(args):
-    """Scan for vulnerabilities."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        vulns = ctx.find_vulnerabilities()
-        
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        data = ctx.find_vulnerabilities()
         if args.json:
-            print(json.dumps(vulns, indent=2))
+            print(json.dumps(data, indent=2))
         else:
-            if not vulns:
-                print("No vulnerabilities found.")
-            else:
-                for v in vulns:
-                    vtype = v.get("type", "?")
-                    severity = v.get("severity", "?")
-                    desc = v.get("description", "?")
-                    print(f"[{severity.upper():8s}] {vtype}: {desc}")
+            for v in data:
+                print(f"[{v.get('severity','?').upper():8s}] {v.get('description','?')}")
+
+
+def cmd_security(args):
+    from r2ofrak.core import R2OFRAKContext
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        data = ctx.security_analysis()
+        if args.json:
+            print(json.dumps(data, indent=2, default=str))
+        else:
+            print(f"\n{'='*60}")
+            print(f"  Security Analysis — {Path(args.target).name}")
+            print(f"{'='*60}")
+            h = data.get("hashes", {})
+            print(f"\n  Hashes:")
+            for k, v in h.items():
+                print(f"    {k}: {v}")
+            prot = data.get("protections", {})
+            print(f"\n  Protections:")
+            for k, v in prot.items():
+                print(f"    {'✅' if v else '❌'} {k}")
+            ad = data.get("anti_debug", [])
+            print(f"\n  Anti-debug: {len(ad)} detected")
+            for a in ad[:10]:
+                print(f"    ⚠ {a.get('description','')} @ {a.get('offset','')}")
+            cr = data.get("crypto", [])
+            print(f"\n  Crypto: {len(cr)} detected")
+            for c in cr[:10]:
+                print(f"    🔑 {c.get('description','')} @ {c.get('offset','')}")
+            vulns = data.get("vulnerabilities", [])
+            print(f"\n  Vulnerabilities: {len(vulns)}")
+            for v in vulns[:10]:
+                print(f"    [{v.get('severity','?').upper()}] {v.get('description','')}")
+
+
+def cmd_apk(args):
+    from r2ofrak.apk_analyzer import APKAnalyzer
+    aa = APKAnalyzer(args.target, args.output)
+    data = aa.analyze()
+    if args.json:
+        print(json.dumps(data, indent=2, default=str))
+    else:
+        print(f"\nAPK Analysis: {args.target}")
+        _pp(data)
+
+
+def cmd_firmware(args):
+    from r2ofrak.firmware import FirmwareAnalyzer
+    fa = FirmwareAnalyzer(args.target, args.output)
+    data = fa.analyze()
+    if args.json:
+        print(json.dumps(data, indent=2, default=str))
+    else:
+        print(f"\nFirmware Analysis: {args.target}")
+        _pp(data)
+
+
+def cmd_compare(args):
+    from r2ofrak.comparator import BinaryComparator
+    comp = BinaryComparator(args.target, args.other)
+    data = comp.compare()
+    if args.json:
+        print(json.dumps(data, indent=2, default=str))
+    else:
+        print(f"\nComparing: {args.target} vs {args.other}")
+        print(f"  Identical: {data.get('identical', False)}")
+        print(f"  Diff regions: {len(data.get('diff_regions', []))}")
+        sd = data.get("string_diffs", {})
+        print(f"  Strings only in A: {len(sd.get('only_in_a', []))}")
+        print(f"  Strings only in B: {len(sd.get('only_in_b', []))}")
 
 
 def cmd_unpack(args):
-    """Unpack binary with OFRAK."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
         result = ctx.unpack()
         print(json.dumps(result, indent=2, default=str))
 
 
 def cmd_patch(args):
-    """Patch binary."""
     from r2ofrak.core import R2OFRAKContext
-    
-    offset = int(args.offset, 0)  # supports hex like 0x1234
+    offset = int(args.offset, 0)
     data = bytes.fromhex(args.hex_data)
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        result = ctx.patch(offset, data)
-        print(f"Patch applied at 0x{offset:08x}: {result['data']}")
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        ctx.patch(offset, data)
+        print(f"Patch applied at 0x{offset:08x}: {data.hex()}")
 
 
 def cmd_nop(args):
-    """NOP patch."""
     from r2ofrak.core import R2OFRAKContext
-    
     offset = int(args.offset, 0)
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        result = ctx.nop_patch(offset, args.size)
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
+        ctx.nop_patch(offset, args.size)
         print(f"NOP'd {args.size} bytes at 0x{offset:08x}")
 
 
 def cmd_repack(args):
-    """Repack binary with OFRAK."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
         output = ctx.repack()
         print(f"Repacked: {output}")
 
 
 def cmd_export(args):
-    """Export analysis results."""
     from r2ofrak.core import R2OFRAKContext
-    
-    with R2OFRAKContext(
-        args.target,
-        output_dir=args.output,
-        verbose=args.verbose,
-    ) as ctx:
-        # Run quick analysis first
+    with R2OFRAKContext(args.target, output_dir=args.output, verbose=args.verbose) as ctx:
         ctx.analyze()
-        output = ctx.export(args.outfile)
-        print(f"Report exported: {output}")
+        out = ctx.export(args.outfile)
+        print(f"Report exported: {out}")
 
 
 def cmd_tui(args):
-    """Launch interactive TUI."""
     from r2ofrak.tui import R2OFRAKApp
-    
-    target = getattr(args, 'target', None) or getattr(args, 'output', None)
+    target = getattr(args, 'target', None)
     output = getattr(args, 'output', None)
-    
     app = R2OFRAKApp(target=target, output_dir=output)
     app.run()
 
@@ -315,125 +259,122 @@ def cmd_tui(args):
 def main():
     parser = argparse.ArgumentParser(
         prog="r2ofrak",
-        description="R2OFRAK — Unified Reverse Engineering Platform (radare2 + OFRAK)",
+        description="R2OFRAK v0.2 — Unified Reverse Engineering Platform",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Modes:
+  r2ofrak                          Launch interactive TUI
+  r2ofrak tui /path/to/binary      Launch TUI with file
+  r2ofrak analyze /path/to/binary  Full analysis (CLI)
+
 Examples:
   r2ofrak analyze /bin/ls                    Full analysis
-  r2ofrak disasm /bin/ls                     Disassemble
-  r2ofrak disasm /bin/ls --mode function     Disassemble functions
-  r2ofrak strings /bin/ls --min-length 8     Extract strings
-  r2ofrak imports /bin/ls --json             List imports (JSON)
-  r2ofrak exports /bin/ls                    List exports
-  r2ofrak functions /bin/ls                  List functions
-  r2ofrak segments /bin/ls                   List segments
-  r2ofrak entropy /bin/ls                    Entropy analysis
-  r2ofrak vulns /bin/ls                      Vulnerability scan
-  r2ofrak unpack firmware.bin                Unpack with OFRAK
-  r2ofrak patch /bin/ls --offset 0x1000 --hex deadbeef
-  r2ofrak nop /bin/ls --offset 0x1000 --size 10
-  r2ofrak repack /bin/ls                     Repack with OFRAK
-  r2ofrak export /bin/ls -o report.json      Export full report
+  r2ofrak security /bin/ls                  Security scan
+  r2ofrak apk app.apk                       Analyze APK
+  r2ofrak firmware router.bin               Analyze firmware
+  r2ofrak compare a.bin b.bin               Compare binaries
+  r2ofrak disasm /bin/ls --mode function    Disassemble
+  r2ofrak strings /bin/ls --min-length 8    Extract strings
+  r2ofrak patch /bin/ls --offset 0x1000 --hex-data deadbeef
+  r2ofrak export /bin/ls -o report.json     Export report
 """
     )
-    
+
     parser.add_argument("--version", action="version", version=f"r2ofrak {__version__}")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("-o", "--output", help="Output directory")
     parser.add_argument("--json", action="store_true", help="JSON output")
-    
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    
-    # analyze
-    p = subparsers.add_parser("analyze", help="Full analysis of binary")
-    p.add_argument("target", help="Target binary")
-    p.set_defaults(func=cmd_analyze)
-    
-    # disasm
-    p = subparsers.add_parser("disasm", aliases=["disassemble"], help="Disassemble binary")
-    p.add_argument("target", help="Target binary")
-    p.add_argument("--mode", choices=["full", "function", "addr", "range"], default="full")
-    p.add_argument("--addr", help="Address to disassemble from")
-    p.add_argument("--count", type=int, default=100, help="Number of instructions")
-    p.set_defaults(func=cmd_disassemble)
-    
-    # strings
-    p = subparsers.add_parser("strings", help="Extract strings")
-    p.add_argument("target", help="Target binary")
-    p.add_argument("--min-length", type=int, default=4, help="Minimum string length")
-    p.set_defaults(func=cmd_strings)
-    
-    # imports
-    p = subparsers.add_parser("imports", help="List imports")
-    p.add_argument("target", help="Target binary")
-    p.set_defaults(func=cmd_imports)
-    
-    # exports
-    p = subparsers.add_parser("exports", help="List exports")
-    p.add_argument("target", help="Target binary")
-    p.set_defaults(func=cmd_exports)
-    
-    # functions
-    p = subparsers.add_parser("functions", aliases=["funcs"], help="List functions")
-    p.add_argument("target", help="Target binary")
-    p.set_defaults(func=cmd_functions)
-    
-    # segments
-    p = subparsers.add_parser("segments", help="List segments/sections")
-    p.add_argument("target", help="Target binary")
-    p.set_defaults(func=cmd_segments)
-    
-    # entropy
-    p = subparsers.add_parser("entropy", help="Entropy analysis")
-    p.add_argument("target", help="Target binary")
-    p.set_defaults(func=cmd_entropy)
-    
-    # vulns
-    p = subparsers.add_parser("vulns", help="Vulnerability scan")
-    p.add_argument("target", help="Target binary")
-    p.set_defaults(func=cmd_vulns)
-    
-    # unpack
-    p = subparsers.add_parser("unpack", help="Unpack with OFRAK")
-    p.add_argument("target", help="Target binary/archive")
-    p.set_defaults(func=cmd_unpack)
-    
-    # patch
-    p = subparsers.add_parser("patch", help="Patch binary")
-    p.add_argument("target", help="Target binary")
-    p.add_argument("--offset", required=True, help="Offset (hex: 0x1234)")
-    p.add_argument("--hex-data", required=True, help="Hex data to write")
+
+    sub = parser.add_subparsers(dest="command")
+
+    # Core commands
+    for name, help_text, fn in [
+        ("analyze", "Full analysis", cmd_analyze),
+        ("disasm", "Disassemble", cmd_disasm),
+        ("strings", "Extract strings", cmd_strings),
+        ("imports", "List imports", cmd_imports),
+        ("exports", "List exports", cmd_exports),
+        ("functions", "List functions", cmd_functions),
+        ("segments", "List segments", cmd_segments),
+        ("entropy", "Entropy analysis", cmd_entropy),
+        ("vulns", "Vulnerability scan", cmd_vulns),
+    ]:
+        p = sub.add_parser(name, help=help_text)
+        p.add_argument("target", help="Target binary")
+        p.set_defaults(func=fn)
+
+    # Security
+    p = sub.add_parser("security", help="Full security analysis")
+    p.add_argument("target")
+    p.set_defaults(func=cmd_security)
+
+    # APK
+    p = sub.add_parser("apk", help="Analyze Android APK/DEX")
+    p.add_argument("target")
+    p.set_defaults(func=cmd_apk)
+
+    # Firmware
+    p = sub.add_parser("firmware", help="Analyze firmware image")
+    p.add_argument("target")
+    p.set_defaults(func=cmd_firmware)
+
+    # Compare
+    p = sub.add_parser("compare", help="Compare two binaries")
+    p.add_argument("target")
+    p.add_argument("other", help="Second binary")
+    p.set_defaults(func=cmd_compare)
+
+    # Patch
+    p = sub.add_parser("patch", help="Patch binary")
+    p.add_argument("target")
+    p.add_argument("--offset", required=True)
+    p.add_argument("--hex-data", required=True)
     p.set_defaults(func=cmd_patch)
-    
-    # nop
-    p = subparsers.add_parser("nop", help="NOP patch")
-    p.add_argument("target", help="Target binary")
-    p.add_argument("--offset", required=True, help="Offset (hex: 0x1234)")
-    p.add_argument("--size", type=int, default=4, help="Number of NOP bytes")
+
+    # NOP
+    p = sub.add_parser("nop", help="NOP patch")
+    p.add_argument("target")
+    p.add_argument("--offset", required=True)
+    p.add_argument("--size", type=int, default=4)
     p.set_defaults(func=cmd_nop)
-    
-    # repack
-    p = subparsers.add_parser("repack", help="Repack with OFRAK")
-    p.add_argument("target", help="Target binary")
+
+    # Unpack
+    p = sub.add_parser("unpack", help="Unpack with OFRAK")
+    p.add_argument("target")
+    p.set_defaults(func=cmd_unpack)
+
+    # Repack
+    p = sub.add_parser("repack", help="Repack with OFRAK")
+    p.add_argument("target")
     p.set_defaults(func=cmd_repack)
-    
-    # export
-    p = subparsers.add_parser("export", help="Export full report")
-    p.add_argument("target", help="Target binary")
-    p.add_argument("-o", "--outfile", help="Output file path")
+
+    # Export
+    p = sub.add_parser("export", help="Export full report")
+    p.add_argument("target")
+    p.add_argument("--outfile", help="Output file")
     p.set_defaults(func=cmd_export)
-    
-    # tui — launch interactive TUI
-    p = subparsers.add_parser("tui", help="Launch interactive TUI (default when no command)")
-    p.add_argument("target", nargs="?", help="Target binary to open")
+
+    # TUI
+    p = sub.add_parser("tui", help="Launch interactive TUI")
+    p.add_argument("target", nargs="?")
     p.set_defaults(func=cmd_tui)
-    
+
+    # Disasm-specific
+    for p_action in [sp for sp in sub._group_actions if hasattr(sp, '_parser_class')]:
+        pass
+    # Add disasm args
+    sub.choices["disasm"].add_argument("--mode", choices=["full", "function", "addr", "range"], default="full")
+    sub.choices["disasm"].add_argument("--addr", help="Address")
+    sub.choices["disasm"].add_argument("--count", type=int, default=100)
+    sub.choices["strings"].add_argument("--min-length", type=int, default=4)
+
     args = parser.parse_args()
-    
+
     if not args.command:
-        # No subcommand → launch TUI
+        # Default: launch TUI
         cmd_tui(args)
-    
+        return
+
     try:
         args.func(args)
     except FileNotFoundError as e:

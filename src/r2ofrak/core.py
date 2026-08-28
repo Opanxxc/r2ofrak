@@ -52,6 +52,7 @@ class R2OFRAKContext:
         self._analysis: Dict[str, Any] = {}
         self._unpacked = False
         self._patches: List[Dict[str, Any]] = []
+        self._recorder = None
 
         # Setup logging
         level = logging.DEBUG if verbose else logging.INFO
@@ -248,6 +249,58 @@ class R2OFRAKContext:
         with open(out_file, "w") as f:
             json.dump(vulns, f, indent=2)
         return vulns
+
+    def security_analysis(self) -> Dict[str, Any]:
+        """Full security analysis (anti-debug, crypto, vulns, YARA)."""
+        from r2ofrak.security import SecurityAnalyzer
+        logger.info("Running security analysis...")
+        sa = SecurityAnalyzer(str(self.target))
+        result = sa.full_analysis()
+        out_file = self.output_dir / "security.json"
+        with open(out_file, "w") as f:
+            json.dump(result, f, indent=2, default=str)
+        return result
+
+    def analyze_apk(self) -> Dict[str, Any]:
+        """Analyze Android APK/DEX."""
+        from r2ofrak.apk_analyzer import APKAnalyzer
+        logger.info("Analyzing APK/DEX...")
+        aa = APKAnalyzer(str(self.target), str(self.output_dir))
+        return aa.analyze()
+
+    def analyze_firmware(self) -> Dict[str, Any]:
+        """Analyze firmware image."""
+        from r2ofrak.firmware import FirmwareAnalyzer
+        logger.info("Analyzing firmware...")
+        fa = FirmwareAnalyzer(str(self.target), str(self.output_dir))
+        return fa.analyze()
+
+    def compare_with(self, other_binary: str) -> Dict[str, Any]:
+        """Compare with another binary."""
+        from r2ofrak.comparator import BinaryComparator
+        logger.info(f"Comparing with {other_binary}...")
+        comp = BinaryComparator(str(self.target), other_binary)
+        return comp.compare()
+
+    def start_recording(self, output_path: Optional[str] = None):
+        """Start recording actions for script generation."""
+        from r2ofrak.recorder import ScriptRecorder
+        self._recorder = ScriptRecorder(output_path)
+        logger.info("Recording started")
+
+    def stop_recording(self) -> Optional[Path]:
+        """Stop recording and save script."""
+        if self._recorder:
+            path = self._recorder.save()
+            self._recorder = None
+            logger.info(f"Script saved to {path}")
+            return path
+        return None
+
+    def _record(self, action: str, **kwargs):
+        """Record action if recording."""
+        if self._recorder:
+            self._recorder.record(action, **kwargs)
 
     def export(self, output_path: Optional[str] = None) -> Path:
         """Export all analysis results."""
