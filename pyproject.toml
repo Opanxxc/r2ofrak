@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "r2ofrak"
+version = "0.1.0"
+description = "Unified Reverse Engineering Platform — radare2 + OFRAK combined"
+readme = "README.md"
+license = {text = "AGPL-3.0"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Opanxxc"},
+]
+keywords = ["reverse-engineering", "radare2", "ofrak", "binary-analysis", "disassembly", "unpacking", "tui"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: POSIX",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+    "Topic :: Software Development :: Disassemblers",
+    "Topic :: Software Development :: Debuggers",
+    "Environment :: Console",
+    "Environment :: Console :: Curses",
+]
+
+dependencies = [
+    "r2pipe>=1.8.0",
+    "textual>=0.40.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+full = [
+    "r2pipe>=1.8.0",
+    "textual>=0.40.0",
+    "rich>=13.0.0",
+    "ofrak>=3.0.0",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff",
+    "mypy",
+]
+
+[project.scripts]
+r2ofrak = "r2ofrak.cli:main"
+r2ofrak-tui = "r2ofrak.tui:main"
+
+[project.urls]
+Homepage = "https://github.com/Opanxxc/r2ofrak"
+Repository = "https://github.com/Opanxxc/r2ofrak"
+Issues = "https://github.com/Opanxxc/r2ofrak/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100

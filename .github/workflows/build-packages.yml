@@ -1,0 +1,171 @@
+name: Build R2OFRAK Packages
+
+on:
+  push:
+    branches: [master, main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.12"
+  DEB_VERSION: "0.1.0"
+
+jobs:
+  # ─── Desktop .deb ────────────────────────────────────────────────────────
+  build-deb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq radare2 fakeroot dpkg-dev
+
+      - name: Build .deb
+        run: |
+          bash scripts/build-desktop-deb.sh
+
+      - name: Verify .deb
+        run: |
+          echo "[*] Verifying .deb..."
+          sudo dpkg -i r2ofrak_${DEB_VERSION}_amd64.deb
+          r2ofrak --version
+          r2ofrak-tui --help || true
+          echo "[+] .deb verified!"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r2ofrak-deb
+          path: "*.deb"
+
+  # ─── .AppImage ──────────────────────────────────────────────────────────
+  build-appimage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq radare2 libfuse2
+
+      - name: Build .AppImage
+        run: |
+          bash scripts/build-appimage.sh
+
+      - name: Verify .AppImage
+        run: |
+          chmod +x R2OFRAK-*.AppImage
+          ./R2OFRAK-*.AppImage --version
+          echo "[+] .AppImage verified!"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r2ofrak-appimage
+          path: "*.AppImage"
+
+  # ─── Termux .deb (aarch64) ──────────────────────────────────────────────
+  build-termux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Termux .deb in Docker
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/work" \
+            -e OFRAK_DEB_VERSION=${{ env.DEB_VERSION }} \
+            termux/termux-docker:aarch64 \
+            bash /work/scripts/build-termux-deb-inside.sh
+
+      - name: Extract .deb from container
+        run: |
+          CONTAINER_ID=$(docker create termux/termux-docker:aarch64)
+          docker cp "${CONTAINER_ID}:/data/data/com.termux/files/home/r2ofrak_${{ env.DEB_VERSION }}_aarch64.deb" ./ 2>/dev/null || \
+          docker cp "${CONTAINER_ID}:/data/data/com.termux/files/home/"*.deb ./ 2>/dev/null || \
+          echo "Deb not found, checking workspace..."
+          ls -la *.deb 2>/dev/null || true
+          docker rm "${CONTAINER_ID}" 2>/dev/null || true
+
+      - name: Auto-test Termux .deb
+        if: hashFiles('scripts/test-termux-deb-inside.sh') != ''
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/work" \
+            termux/termux-docker:aarch64 \
+            bash /work/scripts/test-termux-deb-inside.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r2ofrak-termux-deb
+          path: "*.deb"
+
+  # ─── Release ─────────────────────────────────────────────────────────────
+  release:
+    needs: [build-deb, build-appimage, build-termux]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | head -20
+
+      - name: Create/Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: continuous
+          name: "R2OFRAK Continuous Build"
+          prerelease: true
+          files: |
+            artifacts/**/*.deb
+            artifacts/**/*.AppImage
+          body: |
+            ## R2OFRAK — Unified Reverse Engineering Platform
+            
+            Combines **radare2** + **OFRAK** into one tool.
+            
+            ### Packages
+            - `r2ofrak_*_amd64.deb` — Desktop Debian/Ubuntu
+            - `r2ofrak_*_aarch64.deb` — Termux (Android)
+            - `R2OFRAK-*.AppImage` — Universal Linux
+            
+            ### Quick Start (Termux)
+            ```bash
+            pkg install git radare2
+            apt install ./r2ofrak_*.deb
+            r2ofrak-tui /path/to/binary
+            ```
+            
+            ### Quick Start (Desktop)
+            ```bash
+            sudo apt install radare2
+            sudo dpkg -i r2ofrak_*.deb
+            r2ofrak analyze /path/to/binary
+            ```
