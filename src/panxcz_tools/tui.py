@@ -105,8 +105,8 @@ if HAS_TEXTUAL:
 
         def compose(self) -> ComposeResult:
             with Horizontal():
-                yield Input(placeholder="Address (e.g. entry0, main, 0x401000)", id="disasm-addr", expand=True)
-                yield Input(placeholder="Count", id="disasm-count", value="200", width=8)
+                yield Input(placeholder="Address (e.g. entry0, main, 0x401000)", id="disasm-addr")
+                yield Input(placeholder="Count", id="disasm-count", value="200")
                 yield Button("Disasm", id="disasm-btn", variant="primary")
             yield RichLog(id="disasm-log", auto_scroll=False)
 
@@ -155,8 +155,8 @@ if HAS_TEXTUAL:
 
         def compose(self) -> ComposeResult:
             with Horizontal():
-                yield Input(placeholder="Filter...", id="str-filter", expand=True)
-                yield Input(placeholder="Min len", id="str-minlen", value="6", width=6)
+                yield Input(placeholder="Filter...", id="str-filter")
+                yield Input(placeholder="Min len", id="str-minlen", value="6")
                 yield Button("Extract", id="str-btn", variant="primary")
             yield DataTable(id="strings-table")
 
@@ -338,8 +338,8 @@ if HAS_TEXTUAL:
 
         def compose(self) -> ComposeResult:
             with Horizontal():
-                yield Input(placeholder="Offset (hex)", id="hex-offset", value="0x0", width=14)
-                yield Input(placeholder="Size", id="hex-size", value="512", width=8)
+                yield Input(placeholder="Offset (hex)", id="hex-offset", value="0x0")
+                yield Input(placeholder="Size", id="hex-size", value="512")
                 yield Button("View", id="hex-btn", variant="primary")
             yield RichLog(id="hex-log", auto_scroll=False)
 
@@ -377,8 +377,8 @@ if HAS_TEXTUAL:
 
         def compose(self) -> ComposeResult:
             with Horizontal():
-                yield Input(placeholder="Offset (hex)", id="patch-offset", width=14)
-                yield Input(placeholder="Hex bytes (e.g. 9090)", id="patch-data", expand=True)
+                yield Input(placeholder="Offset (hex)", id="patch-offset")
+                yield Input(placeholder="Hex bytes (e.g. 9090)", id="patch-data")
                 yield Button("Patch", id="patch-btn", variant="warning")
                 yield Button("NOP", id="nop-btn", variant="error")
             yield RichLog(id="patch-log", auto_scroll=False)
@@ -646,7 +646,7 @@ if HAS_TEXTUAL:
 
         def compose(self) -> ComposeResult:
             with Horizontal():
-                yield Input(placeholder="Address or symbol (e.g. main, printf)", id="xref-addr", expand=True)
+                yield Input(placeholder="Address or symbol (e.g. main, printf)", id="xref-addr")
                 yield Button("To", id="xref-to-btn", variant="primary")
                 yield Button("From", id="xref-from-btn", variant="secondary")
             yield RichLog(id="xref-log", auto_scroll=False)
@@ -700,7 +700,7 @@ if HAS_TEXTUAL:
 
         def compose(self) -> ComposeResult:
             with Horizontal():
-                yield Input(placeholder="r2 command (e.g. afl, pdf @ main, iz)", id="r2-cmd", expand=True)
+                yield Input(placeholder="r2 command (e.g. afl, pdf @ main, iz)", id="r2-cmd")
                 yield Button("Run", id="r2-run", variant="primary")
             yield RichLog(id="r2-log", auto_scroll=True)
 
@@ -768,7 +768,7 @@ if HAS_TEXTUAL:
         .hidden { display: none; }
         DataTable { height: 1fr; }
         RichLog { height: 1fr; }
-        Input { margin: 0 0 0 0; }
+        Input { margin: 0 0 0 0; width: 1fr; }
         Button { margin: 0 1; }
         Horizontal { height: auto; }
         """
