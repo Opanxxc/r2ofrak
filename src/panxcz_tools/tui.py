@@ -774,40 +774,42 @@ if HAS_TEXTUAL:
         """
 
         BINDINGS = [
-            Binding("f1", "show_tab('overview')", "Overview"),
-            Binding("f2", "show_tab('disasm')", "Disasm"),
-            Binding("f3", "show_tab('strings')", "Strings"),
-            Binding("f4", "show_tab('imports')", "Imports"),
-            Binding("f5", "show_tab('exports')", "Exports"),
-            Binding("f6", "show_tab('functions')", "Functions"),
-            Binding("f7", "show_tab('segments')", "Segments"),
-            Binding("f8", "show_tab('hex')", "Hex"),
-            Binding("f9", "show_tab('patches')", "Patches"),
-            Binding("f10", "show_tab('security')", "Security"),
-            Binding("f11", "show_tab('vulns')", "Vulns"),
-            Binding("f12", "show_tab('unpacker')", "Unpack"),
-            Binding("ctrl+x", "show_tab('xrefs')", "XRefs"),
-            Binding("ctrl+t", "show_tab('terminal')", "Terminal"),
-            Binding("ctrl+q", "quit", "Quit"),
+            # Number keys — work everywhere including Termux
+            Binding("1", "show_tab('overview')", "Overview"),
+            Binding("2", "show_tab('disasm')", "Disasm"),
+            Binding("3", "show_tab('strings')", "Strings"),
+            Binding("4", "show_tab('imports')", "Imports"),
+            Binding("5", "show_tab('exports')", "Exports"),
+            Binding("6", "show_tab('functions')", "Functions"),
+            Binding("7", "show_tab('segments')", "Segments"),
+            Binding("8", "show_tab('hex')", "Hex"),
+            Binding("9", "show_tab('patches')", "Patches"),
+            Binding("0", "show_tab('security')", "Security"),
+            # Letter keys for extra panels
+            Binding("v", "show_tab('vulns')", "Vulns"),
+            Binding("u", "show_tab('unpacker')", "Unpack"),
+            Binding("x", "show_tab('xrefs')", "XRefs"),
+            Binding("t", "show_tab('terminal')", "Terminal"),
+            Binding("q", "quit", "Quit"),
         ]
 
         TITLE = "Panxcz Tools"
 
         TABS = [
-            ("overview", "📁 Overview", "F1"),
-            ("disasm", "🔍 Disasm", "F2"),
-            ("strings", "📝 Strings", "F3"),
-            ("imports", "📥 Imports", "F4"),
-            ("exports", "📤 Exports", "F5"),
-            ("functions", "⚡ Functions", "F6"),
-            ("segments", "📦 Segments", "F7"),
-            ("hex", "🔢 Hex", "F8"),
-            ("patches", "🩹 Patches", "F9"),
-            ("security", "🛡️ Security", "F10"),
-            ("vulns", "⚠️ Vulns", "F11"),
-            ("unpacker", "📂 Unpack", "F12"),
-            ("xrefs", "🔗 XRefs", "C-X"),
-            ("terminal", "💻 Terminal", "C-T"),
+            ("overview", "📁 Overview", "1"),
+            ("disasm", "🔍 Disasm", "2"),
+            ("strings", "📝 Strings", "3"),
+            ("imports", "📥 Imports", "4"),
+            ("exports", "📤 Exports", "5"),
+            ("functions", "⚡ Functions", "6"),
+            ("segments", "📦 Segments", "7"),
+            ("hex", "🔢 Hex", "8"),
+            ("patches", "🩹 Patches", "9"),
+            ("security", "🛡️ Security", "0"),
+            ("vulns", "⚠️ Vulns", "V"),
+            ("unpacker", "📂 Unpack", "U"),
+            ("xrefs", "🔗 XRefs", "X"),
+            ("terminal", "💻 Terminal", "T"),
         ]
 
         def __init__(self, target=None, output_dir=None, **kw):
