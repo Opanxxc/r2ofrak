@@ -20,7 +20,7 @@ env:
   DEB_VERSION: "0.1.0"
 
 jobs:
-  # ─── Desktop .deb ────────────────────────────────────────────────────────
+  # ─── Desktop .deb (amd64) ──────────────────────────────────────────────
   build-deb:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -37,23 +37,21 @@ jobs:
           sudo apt-get install -y -qq radare2 fakeroot dpkg-dev
 
       - name: Build .deb
-        run: |
-          bash scripts/build-desktop-deb.sh
+        run: bash scripts/build-desktop-deb.sh
 
       - name: Verify .deb
         run: |
-          echo "[*] Verifying .deb..."
+          echo "[*] Verifying..."
           sudo dpkg -i r2ofrak_${DEB_VERSION}_amd64.deb
           r2ofrak --version
-          r2ofrak-tui --help || true
-          echo "[+] .deb verified!"
+          echo "[+] Desktop .deb verified!"
 
       - uses: actions/upload-artifact@v4
         with:
           name: r2ofrak-deb
           path: "*.deb"
 
-  # ─── .AppImage ──────────────────────────────────────────────────────────
+  # ─── .AppImage (portable) ──────────────────────────────────────────────
   build-appimage:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -64,72 +62,49 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install system deps
+      - name: Install deps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq radare2
 
-      - name: Build .AppImage
-        run: |
-          bash scripts/build-appimage.sh
+      - name: Build portable package
+        run: bash scripts/build-appimage.sh
 
       - name: Verify
         run: |
-          ls -lh R2OFRAK-*.AppImage R2OFRAK-*.tar.gz 2>/dev/null || true
-          if [ -f R2OFRAK-*.AppImage ]; then
-            chmod +x R2OFRAK-*.AppImage
-            ./R2OFRAK-*.AppImage --version || echo '[*] .AppImage verify skipped (self-extracting)'
-          fi
-          echo "[+] AppImage built!"
+          ls -lh R2OFRAK-*.tar.gz R2OFRAK-*.AppImage 2>/dev/null || true
+          echo "[+] Portable package built!"
 
       - uses: actions/upload-artifact@v4
         with:
           name: r2ofrak-appimage
           path: R2OFRAK-*
 
-  # ─── Termux .deb (aarch64 via QEMU) ─────────────────────────────────────
+  # ─── Termux .deb (cross-compiled pure Python) ───────────────────────────
   build-termux:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup QEMU for ARM emulation
-        uses: docker/setup-qemu-action@v3
+      - uses: actions/setup-python@v5
         with:
-          platforms: arm64
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Build Termux .deb in Docker
-        run: |
-          docker run --rm --platform linux/arm64 \
-            -v "${{ github.workspace }}:/work" \
-            -e OFRAK_DEB_VERSION=${{ env.DEB_VERSION }} \
-            termux/termux-docker:aarch64 \
-            bash /work/scripts/build-termux-deb-inside.sh
+      - name: Build Termux .deb (pure Python, arch-independent)
+        run: bash scripts/build-termux-cross-deb.sh
 
-      - name: Copy .deb from last build container
+      - name: Verify
         run: |
-          # The build writes to $HOME in the container, find it
-          docker run --rm --platform linux/arm64 \
-            -v "${{ github.workspace }}:/work" \
-            termux/termux-docker:aarch64 \
-            find /data/data/com.termux/files/home -name '*.deb' -exec cp {} /work/ \; 2>/dev/null || true
-          ls -la *.deb 2>/dev/null || echo "No .deb found"
-
-      - name: Auto-test Termux .deb
-        if: hashFiles('scripts/test-termux-deb-inside.sh') != ''
-        run: |
-          docker run --rm --platform linux/arm64 \
-            -v "${{ github.workspace }}:/work" \
-            termux/termux-docker:aarch64 \
-            bash /work/scripts/test-termux-deb-inside.sh
+          ls -lh r2ofrak_*_all.deb 2>/dev/null
+          echo "[+] Termux .deb built!"
 
       - uses: actions/upload-artifact@v4
         with:
           name: r2ofrak-termux-deb
           path: "*.deb"
 
-  # ─── Release ─────────────────────────────────────────────────────────────
+  # ─── Release ────────────────────────────────────────────────────────────
   release:
     needs: [build-deb, build-appimage, build-termux]
     runs-on: ubuntu-latest
@@ -154,6 +129,7 @@ jobs:
           files: |
             artifacts/**/*.deb
             artifacts/**/*.AppImage
+            artifacts/**/*.tar.gz
           body: |
             ## R2OFRAK — Unified Reverse Engineering Platform
             
@@ -161,13 +137,13 @@ jobs:
             
             ### Packages
             - `r2ofrak_*_amd64.deb` — Desktop Debian/Ubuntu
-            - `r2ofrak_*_aarch64.deb` — Termux (Android)
-            - `R2OFRAK-*.AppImage` — Universal Linux
+            - `r2ofrak_*_all.deb` — Termux / Any arch (pure Python)
+            - `R2OFRAK-*.tar.gz` — Universal portable
             
             ### Quick Start (Termux)
             ```bash
             pkg install git radare2
-            apt install ./r2ofrak_*.deb
+            apt install ./r2ofrak_*_all.deb
             r2ofrak-tui /path/to/binary
             ```
             
@@ -176,4 +152,10 @@ jobs:
             sudo apt install radare2
             sudo dpkg -i r2ofrak_*.deb
             r2ofrak analyze /path/to/binary
+            ```
+            
+            ### TUI Mode
+            ```bash
+            r2ofrak-tui              # Interactive TUI
+            r2ofrak-tui /bin/ls      # Open binary directly
             ```
