@@ -8,7 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-DEB_VERSION="${R2OFRAK_DEB_VERSION:-0.1.0}"
+DEB_VERSION="${DEB_VERSION:-0.2.0}"
 PKG_NAME="r2ofrak"
 
 echo "============================================"

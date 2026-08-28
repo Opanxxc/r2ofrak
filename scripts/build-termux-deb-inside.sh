@@ -6,7 +6,7 @@
 # ==============================================================
 set -euo pipefail
 
-DEB_VERSION="${R2OFRAK_DEB_VERSION:-0.1.0}"
+DEB_VERSION="${DEB_VERSION:-0.2.0}"
 PKG_NAME="r2ofrak"
 PREFIX="/data/data/com.termux/files/usr"
 PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3.12")
