@@ -21,7 +21,7 @@ except ImportError:
     HAS_TEXTUAL = False
 
 
-__version__ = "1.0.0"
+__version__ = "0.0.1"
 
 
 if HAS_TEXTUAL:

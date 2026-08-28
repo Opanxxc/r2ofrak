@@ -28,7 +28,7 @@ Panxcz Tools combines the power of **radare2** and **OFRAK** into one unified pl
 ```bash
 # Install
 sudo apt install radare2
-sudo dpkg -i panxcz-tools_1.0.0_amd64.deb
+sudo dpkg -i panxcz-tools_0.0.1_amd64.deb
 
 # Launch GUI
 panxcz-gui /path/to/binary
@@ -39,14 +39,14 @@ panxcz-gui /path/to/binary
 ```bash
 # One-liner install
 pkg install -y git radare2 && \
-  wget -qO /tmp/panxcz.deb https://github.com/Opanxxc/r2ofrak/releases/download/continuous/panxcz-tools_1.0.0_all.deb && \
+  wget -qO /tmp/panxcz.deb https://github.com/Opanxxc/r2ofrak/releases/download/continuous/panxcz-tools_0.0.1_all.deb && \
   apt install -y /tmp/panxcz.deb && \
   panxcz-tui
 
 # Or install manually
 pkg install git radare2
-wget https://github.com/Opanxxc/r2ofrak/releases/download/continuous/panxcz-tools_1.0.0_all.deb
-apt install -y ./panxcz-tools_1.0.0_all.deb
+wget https://github.com/Opanxxc/r2ofrak/releases/download/continuous/panxcz-tools_0.0.1_all.deb
+apt install -y ./panxcz-tools_0.0.1_all.deb
 panxcz-tui /path/to/binary
 ```
 
@@ -112,9 +112,9 @@ Overview • Disasm • Strings • Imports • Exports • Functions • Segmen
 
 | Package | File | Platform |
 |---------|------|----------|
-| Desktop .deb | `panxcz-tools_1.0.0_amd64.deb` | Debian/Ubuntu |
-| Termux .deb | `panxcz-tools_1.0.0_all.deb` | Android/Termux |
-| Portable | `PanxczTools-1.0.0-x86_64.tar.gz` | Any Linux |
+| Desktop .deb | `panxcz-tools_0.0.1_amd64.deb` | Debian/Ubuntu |
+| Termux .deb | `panxcz-tools_0.0.1_all.deb` | Android/Termux |
+| Portable | `PanxczTools-0.0.1-x86_64.tar.gz` | Any Linux |
 
 **Download from:** https://github.com/Opanxxc/panxcz-tools/releases/tag/continuous
 

@@ -6,7 +6,7 @@
 # ==============================================================
 set -euo pipefail
 
-DEB_VERSION="${DEB_VERSION:-0.2.0}"
+DEB_VERSION="${DEB_VERSION:-0.0.1}"
 PKG_NAME="panxcz-tools"
 PREFIX="/data/data/com.termux/files/usr"
 PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3.12")

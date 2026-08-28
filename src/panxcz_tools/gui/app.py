@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 app = FastAPI(
     title="Panxcz Tools",
     description="Unified Reverse Engineering Platform — radare2 + OFRAK",
-    version="1.0.0",
+    version="0.0.1",
 )
 
 # Global state

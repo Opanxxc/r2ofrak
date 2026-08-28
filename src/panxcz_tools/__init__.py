@@ -13,6 +13,6 @@ Features:
   - Speed-optimized with caching and batch commands
 """
 
-__version__ = "2.0.0"
+__version__ = "0.0.1"
 __author__ = "Panxcz"
 __license__ = "AGPL-3.0"

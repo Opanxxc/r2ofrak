@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-APP_VERSION="${DEB_VERSION:-0.2.0}"
+APP_VERSION="${DEB_VERSION:-0.0.1}"
 APP_NAME="PanxczTools"
 
 echo "============================================"
