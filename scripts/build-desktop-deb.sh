@@ -27,13 +27,13 @@ import zipfile, os, hashlib
 
 whl_name = "panxcz-tools-1.0.0-py3-none-any.whl"
 whl = f"/tmp/panxcz-tools-wheels/{whl_name}"
-src = "src/panxcz-tools"
+src = "src/panxcz_tools"
 
 with zipfile.ZipFile(whl, "w", zipfile.ZIP_DEFLATED) as z:
     for root, dirs, files in os.walk(src):
         for f in files:
             if f.endswith(".py"):
-                arc = os.path.join(root, f).replace("src/", "panxcz-tools/")
+                arc = os.path.join(root, f).replace("src/", "panxcz_tools/")
                 z.write(os.path.join(root, f), arc)
     
     di = "panxcz-tools-1.0.0.dist-info"
@@ -68,7 +68,7 @@ python3 -m pip install --target="$STAGE/usr/lib/python3/dist-packages" \
 
 # Fallback: copy source directly
 if [ ! -d "$STAGE/usr/lib/python3/dist-packages/panxcz-tools" ]; then
-    cp -r "$REPO_DIR/src/panxcz-tools" "$STAGE/usr/lib/python3/dist-packages/"
+    cp -r "$REPO_DIR/src/panxcz_tools" "$STAGE/usr/lib/python3/dist-packages/"
 fi
 
 # Wrapper scripts
