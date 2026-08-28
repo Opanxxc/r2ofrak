@@ -83,6 +83,10 @@ jobs:
         with:
           name: panxcz-termux
           path: .
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
       - name: Test in Termux Docker
         run: |
           DEB=$(ls panxcz-tools_*.deb 2>/dev/null | head -1)
@@ -92,7 +96,7 @@ jobs:
             ls -la
             exit 1
           fi
-          docker run --rm \
+          docker run --rm --platform linux/arm64 \
             -v "$(pwd):/work" \
             termux/termux-docker:aarch64 \
             bash -c "
