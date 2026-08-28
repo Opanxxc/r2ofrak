@@ -296,13 +296,13 @@ Examples:
     parser.add_argument("--version", action="version", version=f"panxcz {__version__}")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("-o", "--output", help="Output directory")
-    parser.add_argument("--json", action="store_true", help="JSON output")
 
     sub = parser.add_subparsers(dest="command")
 
     p = sub.add_parser("analyze", help="Full analysis")
     p.add_argument("target")
     p.add_argument("--fast", action="store_true", help="Fast analysis (skip deep analysis)")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_analyze)
 
     p = sub.add_parser("disasm", help="Disassemble")
@@ -316,19 +316,23 @@ Examples:
     p = sub.add_parser("strings", help="Extract strings")
     p.add_argument("target")
     p.add_argument("--min-length", type=int, default=4)
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_strings)
 
     p = sub.add_parser("imports", help="List imports")
     p.add_argument("target")
     p.add_argument("--by-library", action="store_true")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_imports)
 
     p = sub.add_parser("exports", help="List exports")
     p.add_argument("target")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_exports)
 
     p = sub.add_parser("functions", help="List functions")
     p.add_argument("target")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_functions)
 
     p = sub.add_parser("xrefs", help="Cross-references")
@@ -339,6 +343,7 @@ Examples:
 
     p = sub.add_parser("security", help="Security analysis")
     p.add_argument("target")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_security)
 
     p = sub.add_parser("hex", help="Hex dump")
@@ -349,6 +354,7 @@ Examples:
 
     p = sub.add_parser("vulns", help="Vulnerability scan")
     p.add_argument("target")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_vulns)
 
     p = sub.add_parser("unpack", help="Unpack binary/archive")
@@ -359,10 +365,12 @@ Examples:
     p = sub.add_parser("graph", help="Control flow graph")
     p.add_argument("target")
     p.add_argument("--function", help="Function name")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_graph)
 
     p = sub.add_parser("entropy", help="Entropy analysis")
     p.add_argument("target")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_entropy)
 
     p = sub.add_parser("export", help="Export analysis report")
