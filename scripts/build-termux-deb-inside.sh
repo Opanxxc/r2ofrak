@@ -27,7 +27,8 @@ apt-get install -y python python-pip build-essential cmake ninja \
 # ── 2. Copy source to writable location ───────────────────────────
 WORK="$HOME/r2ofrak-build"
 rm -rf "$WORK"
-cp -r /work/* "$WORK/" 2>/dev/null || true
+mkdir -p "$WORK"
+cp -r /work/. "$WORK/" 2>/dev/null || cp -r /work/* "$WORK/" 2>/dev/null || true
 cd "$WORK"
 
 # ── 3. Install Python package ─────────────────────────────────────
