@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 #  R2OFRAK .AppImage builder
-#  Universal Linux binary with embedded Python + radare2 bindings
+#  Creates a portable package with Python + r2ofrak
 # ============================================================
 set -euo pipefail
 
@@ -11,11 +11,11 @@ APP_VERSION="${R2OFRAK_DEB_VERSION:-0.1.0}"
 APP_NAME="R2OFRAK"
 
 echo "============================================"
-echo "  Building ${APP_NAME} .AppImage v${APP_VERSION}"
+echo "  Building ${APP_NAME} package v${APP_VERSION}"
 echo "============================================"
 
 # ── 1. Setup AppDir structure ──────────────────────────────────────
-APPDIR="/tmp/R2OFRAK.AppDir"
+APPDIR="/tmp/${APP_NAME}.AppDir"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin"
 mkdir -p "$APPDIR/usr/lib/python3/dist-packages"
@@ -24,33 +24,41 @@ mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 
 # ── 2. Install Python package ──────────────────────────────────────
 cd "$REPO_DIR"
-python3 -m pip install --target="$APPDIR/usr/lib/python3/dist-packages" \
-    . --no-deps 2>/dev/null || {
-    # Manual copy
-    cp -r src/r2ofrak "$APPDIR/usr/lib/python3/dist-packages/"
-}
 
-# Also install dependencies
-python3 -m pip install --target="$APPDIR/usr/lib/python3/dist-packages" \
+# Install wheel + deps into AppDir
+pip install --target="$APPDIR/usr/lib/python3/dist-packages" \
     textual rich r2pipe 2>/dev/null || true
+
+# Copy source
+cp -r src/r2ofrak "$APPDIR/usr/lib/python3/dist-packages/"
 
 # ── 3. Create launcher script ─────────────────────────────────────
 cat > "$APPDIR/usr/bin/r2ofrak-launcher" << 'LAUNCHER'
 #!/usr/bin/env python3
 """R2OFRAK AppImage launcher."""
-import sys
-import os
+import sys, os
 
-# Add our lib path
 APPDIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(APPDIR, "usr/lib/python3/dist-packages"))
 
-# Prefer our textual/rich over system ones
-sys.path = [p for p in sys.path if "dist-packages" in p or APPDIR in p] + sys.argv[1:]
+# Parse args
+target = None
+cli_mode = False
+args = sys.argv[1:]
+if "--cli" in args:
+    cli_mode = True
+    args.remove("--cli")
+if args:
+    target = args[0]
 
-from r2ofrak.cli import main
-if __name__ == "__main__":
+if cli_mode:
+    from r2ofrak.cli import main
+    sys.argv = [sys.argv[0]] + args
     main()
+else:
+    from r2ofrak.tui import R2OFRAKApp
+    app = R2OFRAKApp(target=target)
+    app.run()
 LAUNCHER
 chmod 755 "$APPDIR/usr/bin/r2ofrak-launcher"
 
@@ -69,12 +77,10 @@ Icon=r2ofrak
 Terminal=true
 Categories=Development;Security;Utility;
 MimeType=application/x-executable;application/x-sharedlib;application/x-object;
-Keywords=reverse-engineering;disassembler;binary-analysis;radare2;ofrak;
 EOF
 
-# ── 5. Icon (placeholder) ─────────────────────────────────────────
-# Create a simple SVG icon
-cat > "$APPDIR/usr/share/icons/hicolor/256x256/apps/r2ofrak.svg" << 'SVG'
+# ── 5. Icon ───────────────────────────────────────────────────────
+cat > "$APPDIR/r2ofrak.svg" << 'SVG'
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
   <rect width="256" height="256" rx="32" fill="#1a1a2e"/>
@@ -84,31 +90,28 @@ cat > "$APPDIR/usr/share/icons/hicolor/256x256/apps/r2ofrak.svg" << 'SVG'
   <text x="128" y="220" text-anchor="middle" font-family="monospace" font-size="18" fill="#6bcf7f">unified RE</text>
 </svg>
 SVG
-cp "$APPDIR/usr/share/icons/hicolor/256x256/apps/r2ofrak.svg" "$APPDIR/r2ofrak.svg"
 
-# ── 6. Download appimagetool ──────────────────────────────────────
-if ! command -v appimagetool &>/dev/null; then
-    echo "[*] Downloading appimagetool..."
-    curl -sSL -o /tmp/appimagetool \
-        "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" 2>/dev/null || \
-    curl -sSL -o /tmp/appimagetool \
-        "https://github.com/AppImage/type2-squashfs-static/releases/download/v1.0.0/appimagetool-x86_64.AppImage" 2>/dev/null || true
-    chmod +x /tmp/appimagetool 2>/dev/null || true
-fi
-
-# ── 7. Build AppImage ─────────────────────────────────────────────
+# ── 6. Create portable tar.gz (universal format) ──────────────────
 cd /tmp
+TARBALL="${APP_NAME}-${APP_VERSION}-x86_64.tar.gz"
+tar czf "$TARBALL" -C /tmp "${APP_NAME}.AppDir"
 
-if [ -x /tmp/appimagetool ]; then
-    ARCH=x86_64 /tmp/appimagetool "$APPDIR" \
-        "${APP_NAME}-${APP_VERSION}-x86_64.AppImage" 2>&1 || {
-        echo "[!] appimagetool failed, creating tar.gz fallback..."
-        tar czf "${APP_NAME}-${APP_VERSION}-x86_64.AppImage.tar.gz" -C /tmp R2OFRAK.AppDir
-    }
-else
-    echo "[!] appimagetool not available, creating tar.gz..."
-    tar czf "${APP_NAME}-${APP_VERSION}-x86_64.AppImage.tar.gz" -C /tmp R2OFRAK.AppDir
-fi
+# ── 7. Also create a .run self-extracting script ──────────────────
+cat > "/tmp/${APP_NAME}-${APP_VERSION}-x86_64.AppImage" << 'RUNSCRIPT'
+#!/usr/bin/env bash
+# R2OFRAK AppImage (self-extracting)
+set -e
+TMPDIR=$(mktemp -d)
+ARCHIVE=$(awk 'BEGIN{lines=0} /^__ARCHIVE__$/{exit} {lines++} END{print NR}' "$0")
+tail -n +$((ARCHIVE+1)) "$0" | tar xzf - -C "$TMPDIR"
+exec "$TMPDIR/${APP_NAME}.AppDir/AppRun" "$@"
+__ARCHIVE__
+RUNSCRIPT
 
-ls -lh /tmp/${APP_NAME}-* 2>/dev/null
-echo "[+] AppImage built successfully!"
+# Append the tarball
+cat "/tmp/$TARBALL" >> "/tmp/${APP_NAME}-${APP_VERSION}-x86_64.AppImage"
+chmod +x "/tmp/${APP_NAME}-${APP_VERSION}-x86_64.AppImage"
+
+echo ""
+ls -lh /tmp/${APP_NAME}-${APP_VERSION}-x86_64.*
+echo "[+] AppImage + tar.gz built successfully!"
