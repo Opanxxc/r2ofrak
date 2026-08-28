@@ -14,21 +14,23 @@ __version__ = "1.0.0"
 def cmd_analyze(args):
     from panxcz_tools.core.r2_engine import R2Engine
     engine = R2Engine(args.target)
-    data = engine.analyze()
+    data = engine.analyze_fast() if args.fast else engine.analyze()
     if args.json:
         print(json.dumps(data, indent=2, default=str))
     else:
         fi = data.get("file_info", {})
         bi = fi.get("bin", {})
         print(f"\n{'='*60}")
-        print(f"  Panxcz Tools — {Path(args.target).name}")
+        print(f"  Panxcz Tools v{__version__} — {Path(args.target).name}")
         print(f"{'='*60}")
-        print(f"  Arch:     {bi.get('arch', '?')}")
-        print(f"  Bits:     {bi.get('bits', '?')}")
-        print(f"  OS:       {bi.get('os', '?')}")
+        print(f"  Arch:      {bi.get('arch', '?')}")
+        print(f"  Bits:      {bi.get('bits', '?')}")
+        print(f"  OS:        {bi.get('os', '?')}")
         print(f"  Functions: {len(data.get('functions', []))}")
         print(f"  Imports:   {len(data.get('imports', []))}")
         print(f"  Strings:   {len(data.get('strings', []))}")
+        print(f"  Sections:  {len(data.get('sections', []))}")
+        print(f"  Time:      {data.get('elapsed_ms', '?')}ms")
 
 
 def cmd_disasm(args):
@@ -36,6 +38,8 @@ def cmd_disasm(args):
     engine = R2Engine(args.target)
     if args.function:
         print(engine.disasm_function(args.function))
+    elif args.graph:
+        print(engine.graph_function(args.function or "main"))
     else:
         print(engine.disasm(addr=args.addr, count=args.count))
 
@@ -48,19 +52,41 @@ def cmd_strings(args):
         print(json.dumps(strings, indent=2))
     else:
         for s in strings:
-            print(f"[{s.get('offset','?')}] {s.get('string','')}")
+            print(f"[{s.get('offset','?')}] [{s.get('type','?')}] {s.get('string','')}")
 
 
 def cmd_imports(args):
     from panxcz_tools.core.r2_engine import R2Engine
     engine = R2Engine(args.target)
-    data = engine.imports()
+    if args.by_library:
+        data = engine.imports_by_library()
+        if args.json:
+            print(json.dumps(data, indent=2))
+        else:
+            for lib, funcs in data.items():
+                print(f"\n[bold]{lib}[/bold] ({len(funcs)})")
+                for f in funcs:
+                    print(f"  {f}")
+    else:
+        data = engine.imports()
+        if args.json:
+            print(json.dumps(data, indent=2))
+        else:
+            for imp in data:
+                if isinstance(imp, dict):
+                    print(f"[{imp.get('plt', '?')}] {imp.get('name', '?')}")
+
+
+def cmd_exports(args):
+    from panxcz_tools.core.r2_engine import R2Engine
+    engine = R2Engine(args.target)
+    data = engine.exports()
     if args.json:
         print(json.dumps(data, indent=2))
     else:
-        for imp in data:
-            if isinstance(imp, dict):
-                print(f"[{imp.get('plt', '?')}] {imp.get('name', '?')}")
+        for exp in data:
+            if isinstance(exp, dict):
+                print(f"[{exp.get('vaddr', '?')}] {exp.get('name', '?')}")
 
 
 def cmd_functions(args):
@@ -72,7 +98,28 @@ def cmd_functions(args):
     else:
         for f in data:
             if isinstance(f, dict):
-                print(f"[0x{f.get('offset', 0):x}] {f.get('name', '?')} (size: {f.get('size', 0)})")
+                print(f"[0x{f.get('offset', 0):x}] {f.get('name', '?')} (size: {f.get('size', 0)}, cc: {f.get('cc', '?')})")
+
+
+def cmd_xrefs(args):
+    from panxcz_tools.core.r2_engine import R2Engine
+    engine = R2Engine(args.target)
+    if args.from_addr:
+        data = engine.xrefs_from(args.address)
+        label = "FROM"
+    else:
+        data = engine.xrefs_to(args.address)
+        label = "TO"
+    if args.json:
+        print(json.dumps(data, indent=2))
+    else:
+        print(f"Cross-references {label} {args.address} ({len(data)}):")
+        for x in data:
+            if isinstance(x, dict):
+                if args.from_addr:
+                    print(f"  {args.address} → 0x{x.get('to', 0):x} ({x.get('type', '?')})")
+                else:
+                    print(f"  0x{x.get('from', 0):x} → {x.get('type', '?')} {x.get('name', args.address)}")
 
 
 def cmd_security(args):
@@ -83,17 +130,32 @@ def cmd_security(args):
         print(json.dumps(data, indent=2, default=str))
     else:
         h = data.get("hashes", {})
-        print(f"\nSecurity: {args.target}")
-        print(f"  SHA256: {h.get('sha256', '?')}")
+        print(f"\n{'='*60}")
+        print(f"  Security Analysis — {args.target}")
+        print(f"{'='*60}")
+        print(f"  SHA256: {h.get('sha256', '?')[:64]}")
         prot = data.get("protections", {})
+        print(f"\n  ─── Protections ───")
         for k, v in prot.items():
-            print(f"  {'✅' if v else '❌'} {k}")
-        ad = data.get("anti_debug", [])
-        print(f"\n  Anti-debug: {len(ad)}")
-        for a in ad[:5]:
-            print(f"    ⚠ {a.get('description','')}")
-        cr = data.get("crypto", [])
-        print(f"  Crypto: {len(cr)}")
+            print(f"    {'✅' if v else '❌'} {k}")
+        for section in ["anti_debug", "anti_root", "anti_emulator", "frida_hooks",
+                        "ssl_pinning", "xposed_hooks", "crypto", "vulnerabilities"]:
+            items = data.get(section, [])
+            if items:
+                print(f"\n  ─── {section.replace('_', ' ').title()} ({len(items)}) ───")
+                for item in items[:10]:
+                    print(f"    {item.get('description', '?')} @ {item.get('offset', '?')}")
+        perms = data.get("permissions", [])
+        if perms:
+            print(f"\n  ─── Permissions ({len(perms)}) ───")
+            for p in perms:
+                print(f"    {p}")
+        signing = data.get("code_signing", {})
+        if signing.get("signed"):
+            print(f"\n  ─── Code Signing ───")
+            print(f"    ✅ {signing.get('type', '?')}")
+            for d in signing.get("details", []):
+                print(f"      • {d}")
 
 
 def cmd_hex(args):
@@ -104,13 +166,86 @@ def cmd_hex(args):
 
 def cmd_vulns(args):
     from panxcz_tools.core.r2_engine import R2Engine
+    from panxcz_tools.core.security import SecurityAnalyzer
     engine = R2Engine(args.target)
-    data = engine.vulnerabilities()
+    vulns = engine.vulnerabilities()
+    sa = SecurityAnalyzer(args.target)
+    data = sa.full()
+    vulns2 = data.get("vulnerabilities", [])
+    total = vulns + vulns2
+    if args.json:
+        print(json.dumps(total, indent=2))
+    else:
+        for v in total:
+            sev = v.get("severity", "?")
+            print(f"[{sev.upper()}] {v.get('description', '?')} @ {v.get('address', v.get('offset', '?'))}")
+
+
+def cmd_unpack(args):
+    from panxcz_tools.unpacker import Unpacker
+    import time
+    t0 = time.time()
+    u = Unpacker(args.target, output_dir=args.output)
+    result = u.unpack()
+    elapsed = int((time.time() - t0) * 1000)
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2, default=str))
+    else:
+        print(f"{'='*60}")
+        print(f"  Unpack Result — {args.target}")
+        print(f"{'='*60}")
+        print(f"  Type:       {result.file_type}")
+        print(f"  Success:    {result.success}")
+        print(f"  Files:      {result.file_count}")
+        print(f"  Size:       {result.total_size:,} bytes")
+        print(f"  Output:     {result.output_dir}")
+        print(f"  Time:       {elapsed}ms")
+        if result.metadata:
+            print(f"\n  ─── Metadata ───")
+            for k, v in result.metadata.items():
+                if isinstance(v, list) and len(v) > 10:
+                    print(f"    {k}: [{len(v)} items]")
+                else:
+                    print(f"    {k}: {v}")
+        if result.errors:
+            print(f"\n  Errors:")
+            for e in result.errors:
+                print(f"    ⚠ {e}")
+
+
+def cmd_graph(args):
+    from panxcz_tools.core.r2_engine import R2Engine
+    engine = R2Engine(args.target)
+    if args.json:
+        data = engine.graph_json(args.function or "main")
+        print(json.dumps(data, indent=2))
+    else:
+        print(engine.graph_function(args.function or "main"))
+
+
+def cmd_entropy(args):
+    from panxcz_tools.core.r2_engine import R2Engine
+    engine = R2Engine(args.target)
+    data = engine.entropy()
     if args.json:
         print(json.dumps(data, indent=2))
     else:
-        for v in data:
-            print(f"[{v.get('severity','?').upper()}] {v.get('description','?')}")
+        for sec in data:
+            ent = sec.get("entropy", 0)
+            bar = "█" * int(ent * 10)
+            print(f"  {sec.get('name', '?'):20s}  entropy: {ent:.2f}  {bar}")
+
+
+def cmd_export(args):
+    from panxcz_tools.core.r2_engine import R2Engine
+    engine = R2Engine(args.target)
+    output = args.output or f"{args.target}.report.json"
+    report = engine.export_report(output)
+    print(f"Report exported to {output}")
+    print(f"  Functions: {len(report.get('analysis', {}).get('functions', []))}")
+    print(f"  Imports:   {len(report.get('analysis', {}).get('imports', []))}")
+    print(f"  Strings:   {len(report.get('analysis', {}).get('strings', []))}")
+    print(f"  Vulns:     {len(report.get('vulnerabilities', []))}")
 
 
 def cmd_gui(args):
@@ -134,35 +269,40 @@ def cmd_tui(args):
 def main():
     parser = argparse.ArgumentParser(
         prog="panxcz",
-        description="Panxcz Tools v1.0 — Unified Reverse Engineering Platform",
+        description=f"Panxcz Tools v{__version__} — Unified Reverse Engineering Platform",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Modes:
-  panxcz                             Launch TUI (default)
-  panxcz gui                         Launch Web GUI (http://localhost:8888)
-  panxcz gui /path/to/binary         Launch GUI with file
-  panxcz analyze /path/to/binary     Full analysis (CLI)
-  panxcz security /path/to/binary    Security scan
+  panxcz                              Launch TUI (default)
+  panxcz gui                          Launch Web GUI (http://localhost:8888)
+  panxcz analyze /path/to/binary      Full analysis
+  panxcz security /path/to/binary     Security scan
+  panxcz unpack /path/to/file         Unpack binary/archive
 
 Examples:
   panxcz analyze /bin/ls
+  panxcz analyze /bin/ls --fast
   panxcz security /bin/ls
   panxcz disasm /bin/ls --function main
+  panxcz disasm /bin/ls --graph
   panxcz strings /bin/ls --min-length 8
-  panxcz hex /bin/ls --offset 0
-  panxcz gui /bin/ls --port 8888
+  panxcz xrefs /bin/ls printf
+  panxcz unpack firmware.bin
+  panxcz unpack app.apk -o /tmp/output
+  panxcz export /bin/ls -o report.json
 """
     )
 
     parser.add_argument("--version", action="version", version=f"panxcz {__version__}")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("-o", "--output", help="Output directory")
-    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--json", action="store_true", help="JSON output")
 
     sub = parser.add_subparsers(dest="command")
 
     p = sub.add_parser("analyze", help="Full analysis")
     p.add_argument("target")
+    p.add_argument("--fast", action="store_true", help="Fast analysis (skip deep analysis)")
     p.set_defaults(func=cmd_analyze)
 
     p = sub.add_parser("disasm", help="Disassemble")
@@ -170,6 +310,7 @@ Examples:
     p.add_argument("--function", help="Function name")
     p.add_argument("--addr", help="Address")
     p.add_argument("--count", type=int, default=200)
+    p.add_argument("--graph", action="store_true", help="Show control flow graph")
     p.set_defaults(func=cmd_disasm)
 
     p = sub.add_parser("strings", help="Extract strings")
@@ -179,11 +320,22 @@ Examples:
 
     p = sub.add_parser("imports", help="List imports")
     p.add_argument("target")
+    p.add_argument("--by-library", action="store_true")
     p.set_defaults(func=cmd_imports)
+
+    p = sub.add_parser("exports", help="List exports")
+    p.add_argument("target")
+    p.set_defaults(func=cmd_exports)
 
     p = sub.add_parser("functions", help="List functions")
     p.add_argument("target")
     p.set_defaults(func=cmd_functions)
+
+    p = sub.add_parser("xrefs", help="Cross-references")
+    p.add_argument("target")
+    p.add_argument("address")
+    p.add_argument("--from-addr", action="store_true", help="Xrefs FROM address")
+    p.set_defaults(func=cmd_xrefs)
 
     p = sub.add_parser("security", help="Security analysis")
     p.add_argument("target")
@@ -198,6 +350,25 @@ Examples:
     p = sub.add_parser("vulns", help="Vulnerability scan")
     p.add_argument("target")
     p.set_defaults(func=cmd_vulns)
+
+    p = sub.add_parser("unpack", help="Unpack binary/archive")
+    p.add_argument("target")
+    p.add_argument("-o", "--output", help="Output directory")
+    p.set_defaults(func=cmd_unpack)
+
+    p = sub.add_parser("graph", help="Control flow graph")
+    p.add_argument("target")
+    p.add_argument("--function", help="Function name")
+    p.set_defaults(func=cmd_graph)
+
+    p = sub.add_parser("entropy", help="Entropy analysis")
+    p.add_argument("target")
+    p.set_defaults(func=cmd_entropy)
+
+    p = sub.add_parser("export", help="Export analysis report")
+    p.add_argument("target")
+    p.add_argument("-o", "--output", help="Output file")
+    p.set_defaults(func=cmd_export)
 
     p = sub.add_parser("gui", help="Launch Web GUI")
     p.add_argument("target", nargs="?")

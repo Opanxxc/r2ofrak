@@ -1,10 +1,11 @@
 """
 Panxcz Tools TUI — Textual-based reverse engineering interface.
-Tabs: Overview, Disasm, Strings, Imports, Functions, Segments,
-      Hex, Patches, Security, Vulns, Terminal
+14 panels: Overview, Disasm, Strings, Imports, Exports, Functions,
+           Segments, Hex, Patches, Security, Vulns, Unpacker, XRefs, Terminal.
 """
 
 import sys
+import time
 from pathlib import Path
 
 try:
@@ -13,9 +14,8 @@ try:
     from textual.containers import Horizontal, Vertical, ScrollableContainer
     from textual.widgets import (
         Header, Footer, Static, DataTable, Input, RichLog,
-        Label, Tabs, Tab, Button, Select, OptionList, Markdown,
+        Label, Button, ProgressBar, Select,
     )
-    from textual.reactive import reactive
     HAS_TEXTUAL = True
 except ImportError:
     HAS_TEXTUAL = False
@@ -25,12 +25,15 @@ __version__ = "1.0.0"
 
 
 if HAS_TEXTUAL:
+
+    # ═══════════════════════════════════════════════════════════════
+    #  OVERVIEW PANEL
+    # ═══════════════════════════════════════════════════════════════
+
     class OverviewPanel(Static):
-        """Binary overview panel."""
         def __init__(self, target=None, **kw):
             super().__init__(**kw)
             self.target = target
-            self._data = None
 
         def compose(self) -> ComposeResult:
             yield RichLog(id="overview-log", auto_scroll=False)
@@ -46,74 +49,114 @@ if HAS_TEXTUAL:
                 log = self.query_one("#overview-log")
                 bi = info.get("bin", {})
                 fi = info.get("core", {})
+                funcs = engine.functions()
+                imports = engine.imports()
+                sections = engine.sections()
+                strings = engine.strings(min_len=6)
+
                 lines = [
-                    f"[bold cyan]═══ Panxcz Tools v{__version__} ═══[/bold cyan]",
-                    f"File:      [green]{self.target}[/green]",
-                    f"Arch:      {bi.get('arch', '?')}",
-                    f"Bits:      {bi.get('bits', '?')}",
-                    f"OS:        {bi.get('os', '?')}",
-                    f"Endian:    {bi.get('endian', '?')}",
-                    f"Type:      {bi.get('class', '?')}",
-                    f"Compiler:  {bi.get('compiler', 'unknown')}",
-                    f"Stripped:  {bi.get('stripped', '?')}",
-                    f"Relocs:    {bi.get('relocs', '?')}",
-                    f"Size:      {fi.get('size', '?')} bytes",
-                    f"MD5:       {fi.get('md5', '?')[:32]}",
+                    f"[bold cyan]═══════════════════════════════════════════════════════[/bold cyan]",
+                    f"[bold cyan]  Panxcz Tools v{__version__} — Binary Overview[/bold cyan]",
+                    f"[bold cyan]═══════════════════════════════════════════════════════[/bold cyan]",
+                    "",
+                    f"  [bold]File:[/bold]     [green]{self.target}[/green]",
+                    f"  [bold]Arch:[/bold]     {bi.get('arch', '?')}",
+                    f"  [bold]Bits:[/bold]     {bi.get('bits', '?')}",
+                    f"  [bold]OS:[/bold]       {bi.get('os', '?')}",
+                    f"  [bold]Endian:[/bold]   {bi.get('endian', '?')}",
+                    f"  [bold]Type:[/bold]     {bi.get('class', '?')}",
+                    f"  [bold]Compiler:[/bold] {bi.get('compiler', 'unknown')}",
+                    f"  [bold]Stripped:[/bold] {bi.get('stripped', '?')}",
+                    f"  [bold]Relocs:[/bold]   {bi.get('relocs', '?')}",
+                    f"  [bold]Size:[/bold]     {fi.get('size', '?'):,} bytes",
+                    "",
+                    f"  [bold yellow]─── Statistics ───[/bold yellow]",
+                    f"  Functions:  [cyan]{len(funcs)}[/cyan]",
+                    f"  Imports:    [cyan]{len(imports)}[/cyan]",
+                    f"  Sections:   [cyan]{len(sections)}[/cyan]",
+                    f"  Strings:    [cyan]{len(strings)}[/cyan]",
                 ]
+
+                # Protection flags
+                try:
+                    from panxcz_tools.core.security import SecurityAnalyzer
+                    sa = SecurityAnalyzer(self.target)
+                    prots = sa.protections()
+                    lines.append("")
+                    lines.append("  [bold yellow]─── Protections ───[/bold yellow]")
+                    for k, v in prots.items():
+                        icon = "✅" if v else "❌"
+                        lines.append(f"  {icon} {k}")
+                except Exception:
+                    pass
+
                 log.write("\n".join(lines))
             except Exception as e:
                 self.query_one("#overview-log").write(f"[red]Error: {e}[/red]")
 
+    # ═══════════════════════════════════════════════════════════════
+    #  DISASM PANEL
+    # ═══════════════════════════════════════════════════════════════
+
     class DisasmPanel(Static):
-        """Disassembly panel."""
-        def __init__(self, target=None, **kw):
-            super().__init__(**kw)
-            self.target = target
-
-        def compose(self) -> ComposeResult:
-            with Vertical():
-                yield Input(placeholder="Address (e.g. entry0, main, 0x401000)", id="disasm-addr")
-                yield Button("Disassemble", id="disasm-btn", variant="primary")
-                yield RichLog(id="disasm-log", auto_scroll=False)
-
-        def on_button_pressed(self, event):
-            if event.button.id == "disasm-btn":
-                addr = self.query_one("#disasm-addr").value or "entry0"
-                self._disassemble(addr)
-
-        def on_mount(self):
-            if self.target:
-                self._disassemble("entry0")
-
-        def _disassemble(self, addr):
-            try:
-                from panxcz_tools.core.r2_engine import R2Engine
-                engine = R2Engine(self.target)
-                engine.cmd("aaa")
-                output = engine.cmd(f"pd 200 @ {addr}")
-                log = self.query_one("#disasm-log")
-                log.clear()
-                for line in output.split("\n"):
-                    if "sym." in line or "fcn." in line or "sub." in line:
-                        log.write(f"[bold yellow]{line}[/bold yellow]")
-                    elif "jnz" in line or "je" in line or "jmp" in line:
-                        log.write(f"[bold red]{line}[/bold red]")
-                    elif "mov" in line or "push" in line:
-                        log.write(f"[cyan]{line}[/cyan]")
-                    else:
-                        log.write(line)
-            except Exception as e:
-                self.query_one("#disasm-log").write(f"[red]Error: {e}[/red]")
-
-    class StringsPanel(Static):
-        """String extraction panel."""
         def __init__(self, target=None, **kw):
             super().__init__(**kw)
             self.target = target
 
         def compose(self) -> ComposeResult:
             with Horizontal():
-                yield Input(placeholder="Filter strings...", id="str-filter", expand=True)
+                yield Input(placeholder="Address (e.g. entry0, main, 0x401000)", id="disasm-addr", expand=True)
+                yield Input(placeholder="Count", id="disasm-count", value="200", width=8)
+                yield Button("Disasm", id="disasm-btn", variant="primary")
+            yield RichLog(id="disasm-log", auto_scroll=False)
+
+        def on_button_pressed(self, event):
+            if event.button.id == "disasm-btn":
+                addr = self.query_one("#disasm-addr").value or "entry0"
+                count = int(self.query_one("#disasm-count").value or "200")
+                self._disassemble(addr, count)
+
+        def on_mount(self):
+            if self.target:
+                self._disassemble("entry0", 200)
+
+        def _disassemble(self, addr, count):
+            try:
+                from panxcz_tools.core.r2_engine import R2Engine
+                engine = R2Engine(self.target)
+                engine.cmd("aaa")
+                output = engine.cmd(f"pd {count} @ {addr}")
+                log = self.query_one("#disasm-log")
+                log.clear()
+                for line in output.split("\n"):
+                    if not line.strip():
+                        log.write(line)
+                    elif any(k in line for k in ["sym.", "fcn.", "sub.", "entry"]):
+                        log.write(f"[bold yellow]{line}[/bold yellow]")
+                    elif any(k in line for k in ["jnz", "je ", "jne", "jmp", "call"]):
+                        log.write(f"[bold red]{line}[/bold red]")
+                    elif any(k in line for k in ["mov", "push", "pop", "lea"]):
+                        log.write(f"[cyan]{line}[/cyan]")
+                    elif "NOP" in line or "nop" in line:
+                        log.write(f"[dim]{line}[/dim]")
+                    else:
+                        log.write(line)
+            except Exception as e:
+                self.query_one("#disasm-log").write(f"[red]Error: {e}[/red]")
+
+    # ═══════════════════════════════════════════════════════════════
+    #  STRINGS PANEL
+    # ═══════════════════════════════════════════════════════════════
+
+    class StringsPanel(Static):
+        def __init__(self, target=None, **kw):
+            super().__init__(**kw)
+            self.target = target
+
+        def compose(self) -> ComposeResult:
+            with Horizontal():
+                yield Input(placeholder="Filter...", id="str-filter", expand=True)
+                yield Input(placeholder="Min len", id="str-minlen", value="6", width=6)
                 yield Button("Extract", id="str-btn", variant="primary")
             yield DataTable(id="strings-table")
 
@@ -124,35 +167,41 @@ if HAS_TEXTUAL:
         def on_mount(self):
             if self.target:
                 table = self.query_one("#strings-table")
-                table.add_columns("Offset", "VAddr", "Type", "String")
+                table.add_columns("Offset", "VAddr", "Type", "Len", "String")
                 self._extract()
 
         def _extract(self):
             try:
                 from panxcz_tools.core.r2_engine import R2Engine
                 engine = R2Engine(self.target)
+                min_len = int(self.query_one("#str-minlen").value or "6")
                 filter_text = self.query_one("#str-filter").value.lower()
-                strings = engine.strings(min_len=4)
+                strings = engine.strings(min_len=min_len)
                 table = self.query_one("#strings-table")
                 table.clear()
                 count = 0
                 for s in strings:
-                    if filter_text and filter_text not in s.get("string", "").lower():
+                    val = s.get("string", "")
+                    if filter_text and filter_text not in val.lower():
                         continue
                     table.add_row(
                         s.get("offset", "0x0"),
                         s.get("vaddr", "0x0"),
                         s.get("type", "?"),
-                        s.get("string", ""),
+                        str(len(val)),
+                        val[:120],
                     )
                     count += 1
-                    if count > 500:
+                    if count > 1000:
                         break
             except Exception as e:
-                self.query_one("#strings-table").add_row("Error", "", "", str(e))
+                self.query_one("#strings-table").add_row("Error", "", "", "", str(e))
+
+    # ═══════════════════════════════════════════════════════════════
+    #  IMPORTS PANEL
+    # ═══════════════════════════════════════════════════════════════
 
     class ImportsPanel(Static):
-        """Import table panel."""
         def __init__(self, target=None, **kw):
             super().__init__(**kw)
             self.target = target
@@ -164,7 +213,7 @@ if HAS_TEXTUAL:
             if not self.target:
                 return
             table = self.query_one("#imports-table")
-            table.add_columns("PLT", "Name", "Type")
+            table.add_columns("PLT", "Name", "Library")
             try:
                 from panxcz_tools.core.r2_engine import R2Engine
                 engine = R2Engine(self.target)
@@ -172,25 +221,125 @@ if HAS_TEXTUAL:
                 imports = engine.imports()
                 for imp in imports:
                     if isinstance(imp, dict):
-                        name = imp.get("name", "?")
                         table.add_row(
                             str(imp.get("plt", "?")),
-                            name,
-                            "func",
+                            imp.get("name", "?"),
+                            imp.get("libname", ""),
                         )
             except Exception as e:
                 table.add_row("Error", str(e), "")
 
+    # ═══════════════════════════════════════════════════════════════
+    #  EXPORTS PANEL
+    # ═══════════════════════════════════════════════════════════════
+
+    class ExportsPanel(Static):
+        def __init__(self, target=None, **kw):
+            super().__init__(**kw)
+            self.target = target
+
+        def compose(self) -> ComposeResult:
+            yield DataTable(id="exports-table")
+
+        def on_mount(self):
+            if not self.target:
+                return
+            table = self.query_one("#exports-table")
+            table.add_columns("VAddr", "Name", "Type")
+            try:
+                from panxcz_tools.core.r2_engine import R2Engine
+                engine = R2Engine(self.target)
+                engine.cmd("aaa")
+                exports = engine.exports()
+                for exp in exports:
+                    if isinstance(exp, dict):
+                        table.add_row(
+                            str(exp.get("vaddr", "?")),
+                            exp.get("name", "?"),
+                            exp.get("type", ""),
+                        )
+            except Exception as e:
+                table.add_row("Error", str(e), "")
+
+    # ═══════════════════════════════════════════════════════════════
+    #  FUNCTIONS PANEL
+    # ═══════════════════════════════════════════════════════════════
+
+    class FunctionsPanel(Static):
+        def __init__(self, target=None, **kw):
+            super().__init__(**kw)
+            self.target = target
+
+        def compose(self) -> ComposeResult:
+            yield DataTable(id="funcs-table")
+
+        def on_mount(self):
+            if not self.target:
+                return
+            table = self.query_one("#funcs-table")
+            table.add_columns("Offset", "Name", "Size", "Calls")
+            try:
+                from panxcz_tools.core.r2_engine import R2Engine
+                engine = R2Engine(self.target)
+                engine.cmd("aaa")
+                funcs = engine.functions()
+                for f in funcs:
+                    if isinstance(f, dict):
+                        table.add_row(
+                            f"0x{f.get('offset', 0):x}",
+                            f.get("name", "?"),
+                            str(f.get("size", 0)),
+                            str(f.get("cc", "?")),
+                        )
+            except Exception as e:
+                table.add_row("Error", str(e), "", "")
+
+    # ═══════════════════════════════════════════════════════════════
+    #  SEGMENTS PANEL
+    # ═══════════════════════════════════════════════════════════════
+
+    class SegmentsPanel(Static):
+        def __init__(self, target=None, **kw):
+            super().__init__(**kw)
+            self.target = target
+
+        def compose(self) -> ComposeResult:
+            yield DataTable(id="segments-table")
+
+        def on_mount(self):
+            if not self.target:
+                return
+            table = self.query_one("#segments-table")
+            table.add_columns("Name", "VAddr", "Size", "Type", "Perm")
+            try:
+                from panxcz_tools.core.r2_engine import R2Engine
+                engine = R2Engine(self.target)
+                sections = engine.sections()
+                for sec in sections:
+                    if isinstance(sec, dict):
+                        table.add_row(
+                            sec.get("name", "?"),
+                            f"0x{sec.get('vaddr', 0):x}",
+                            str(sec.get("size", 0)),
+                            sec.get("type", "?"),
+                            sec.get("perm", "?"),
+                        )
+            except Exception as e:
+                table.add_row("Error", str(e), "", "", "")
+
+    # ═══════════════════════════════════════════════════════════════
+    #  HEX PANEL
+    # ═══════════════════════════════════════════════════════════════
+
     class HexPanel(Static):
-        """Hex view panel."""
         def __init__(self, target=None, **kw):
             super().__init__(**kw)
             self.target = target
 
         def compose(self) -> ComposeResult:
             with Horizontal():
-                yield Input(placeholder="Offset (hex, e.g. 0x0)", id="hex-offset", value="0x0")
-                yield Input(placeholder="Size (bytes)", id="hex-size", value="512")
+                yield Input(placeholder="Offset (hex)", id="hex-offset", value="0x0", width=14)
+                yield Input(placeholder="Size", id="hex-size", value="512", width=8)
                 yield Button("View", id="hex-btn", variant="primary")
             yield RichLog(id="hex-log", auto_scroll=False)
 
@@ -210,15 +359,67 @@ if HAS_TEXTUAL:
                 size_str = self.query_one("#hex-size").value or "512"
                 offset = int(offset_str, 16) if offset_str.startswith("0x") else int(offset_str)
                 size = int(size_str)
-                output = engine.hexdump(offset=offset, size=size)
+                output = engine.hexdump(offset=offset, size=min(size, 4096))
                 log = self.query_one("#hex-log")
                 log.clear()
                 log.write(output)
             except Exception as e:
                 self.query_one("#hex-log").write(f"[red]Error: {e}[/red]")
 
+    # ═══════════════════════════════════════════════════════════════
+    #  PATCHES PANEL
+    # ═══════════════════════════════════════════════════════════════
+
+    class PatchesPanel(Static):
+        def __init__(self, target=None, **kw):
+            super().__init__(**kw)
+            self.target = target
+
+        def compose(self) -> ComposeResult:
+            with Horizontal():
+                yield Input(placeholder="Offset (hex)", id="patch-offset", width=14)
+                yield Input(placeholder="Hex bytes (e.g. 9090)", id="patch-data", expand=True)
+                yield Button("Patch", id="patch-btn", variant="warning")
+                yield Button("NOP", id="nop-btn", variant="error")
+            yield RichLog(id="patch-log", auto_scroll=False)
+
+        def on_button_pressed(self, event):
+            if event.button.id == "patch-btn":
+                self._patch()
+            elif event.button.id == "nop-btn":
+                self._nop()
+
+        def _patch(self):
+            try:
+                from panxcz_tools.core.r2_engine import R2Engine
+                engine = R2Engine(self.target)
+                offset = int(self.query_one("#patch-offset").value, 16)
+                data = self.query_one("#patch-data").value
+                engine.patch(offset, data)
+                self.query_one("#patch-log").write(
+                    f"[green]✓ Patched {len(data)//2} bytes at 0x{offset:x}[/green]"
+                )
+            except Exception as e:
+                self.query_one("#patch-log").write(f"[red]Error: {e}[/red]")
+
+        def _nop(self):
+            try:
+                from panxcz_tools.core.r2_engine import R2Engine
+                engine = R2Engine(self.target)
+                offset = int(self.query_one("#patch-offset").value, 16)
+                size = int(self.query_one("#patch-data").value or "1")
+                engine.nop(offset, size)
+                self.query_one("#patch-log").write(
+                    f"[green]✓ NOP'd {size} bytes at 0x{offset:x}[/green]"
+                )
+            except Exception as e:
+                self.query_one("#patch-log").write(f"[red]Error: {e}[/red]")
+
+    # ═══════════════════════════════════════════════════════════════
+    #  SECURITY PANEL
+    # ═══════════════════════════════════════════════════════════════
+
     class SecurityPanel(Static):
-        """Security analysis panel."""
         def __init__(self, target=None, **kw):
             super().__init__(**kw)
             self.target = target
@@ -234,28 +435,85 @@ if HAS_TEXTUAL:
                 sa = SecurityAnalyzer(self.target)
                 data = sa.full()
                 log = self.query_one("#security-log")
-                log.write("[bold cyan]═══ Security Analysis ═══[/bold cyan]")
+                log.write("[bold cyan]═══════════════════════════════════════[/bold cyan]")
+                log.write("[bold cyan]  Security Analysis Report[/bold cyan]")
+                log.write("[bold cyan]═══════════════════════════════════════[/bold cyan]")
+
                 h = data.get("hashes", {})
-                log.write(f"SHA256: {h.get('sha256', '?')[:64]}")
+                log.write(f"\n  [bold]SHA256:[/bold] {h.get('sha256', '?')[:64]}")
+
+                # Protections
                 prot = data.get("protections", {})
+                log.write(f"\n  [bold yellow]─── Protections ───[/bold yellow]")
                 for k, v in prot.items():
                     icon = "✅" if v else "❌"
                     log.write(f"  {icon} {k}")
+
+                # Anti-debug
                 ad = data.get("anti_debug", [])
                 if ad:
-                    log.write(f"\n[bold red]Anti-debug ({len(ad)}):[/bold red]")
-                    for a in ad[:10]:
-                        log.write(f"  ⚠ {a.get('description', a.get('type', '?'))}")
+                    log.write(f"\n  [bold red]─── Anti-Debug ({len(ad)}) ───[/bold red]")
+                    for a in ad[:15]:
+                        log.write(f"  ⚠ {a.get('description', '?')} @ {a.get('offset', '?')}")
+
+                # Anti-root
+                ar = data.get("anti_root", [])
+                if ar:
+                    log.write(f"\n  [bold red]─── Anti-Root ({len(ar)}) ───[/bold red]")
+                    for a in ar[:10]:
+                        log.write(f"  🔒 {a.get('description', '?')} @ {a.get('offset', '?')}")
+
+                # Anti-emulator
+                ae = data.get("anti_emulator", [])
+                if ae:
+                    log.write(f"\n  [bold red]─── Anti-Emulator ({len(ae)}) ───[/bold red]")
+                    for a in ae[:10]:
+                        log.write(f"  📱 {a.get('description', '?')} @ {a.get('offset', '?')}")
+
+                # Frida
+                fr = data.get("frida_hooks", [])
+                if fr:
+                    log.write(f"\n  [bold red]─── Frida Detection ({len(fr)}) ───[/bold red]")
+                    for f in fr[:10]:
+                        log.write(f"  🕵 {f.get('description', '?')} @ {f.get('offset', '?')}")
+
+                # SSL Pinning
+                ssl = data.get("ssl_pinning", [])
+                if ssl:
+                    log.write(f"\n  [bold yellow]─── SSL Pinning ({len(ssl)}) ───[/bold yellow]")
+                    for s in ssl[:10]:
+                        log.write(f"  🔐 {s.get('description', '?')} @ {s.get('offset', '?')}")
+
+                # Crypto
                 cr = data.get("crypto", [])
                 if cr:
-                    log.write(f"\n[bold yellow]Crypto ({len(cr)}):[/bold yellow]")
+                    log.write(f"\n  [bold]─── Crypto ({len(cr)}) ───[/bold]")
                     for c in cr[:10]:
-                        log.write(f"  🔐 {c.get('description', c.get('type', '?'))}")
+                        log.write(f"  🔑 {c.get('description', '?')} @ {c.get('offset', '?')}")
+
+                # Permissions
+                perms = data.get("permissions", [])
+                if perms:
+                    log.write(f"\n  [bold]─── Permissions ({len(perms)}) ───[/bold]")
+                    for p in perms:
+                        log.write(f"  📋 {p}")
+
+                # Signing
+                signing = data.get("code_signing", {})
+                if signing.get("signed"):
+                    log.write(f"\n  [bold green]─── Code Signing ───[/bold green]")
+                    log.write(f"  ✅ Signed ({signing.get('type', '?')})")
+                    for d in signing.get("details", []):
+                        log.write(f"    • {d}")
+
             except Exception as e:
                 self.query_one("#security-log").write(f"[red]Error: {e}[/red]")
 
+    # ═══════════════════════════════════════════════════════════════
+    #  VULNS PANEL
+    # ═══════════════════════════════════════════════════════════════
+
     class VulnsPanel(Static):
-        """Vulnerability scan panel."""
         def __init__(self, target=None, **kw):
             super().__init__(**kw)
             self.target = target
@@ -268,22 +526,173 @@ if HAS_TEXTUAL:
                 return
             try:
                 from panxcz_tools.core.r2_engine import R2Engine
+                from panxcz_tools.core.security import SecurityAnalyzer
+
                 engine = R2Engine(self.target)
                 vulns = engine.vulnerabilities()
+                sa = SecurityAnalyzer(self.target)
+                data = sa.full()
+                sus = data.get("suspicious_strings", [])
+                vulns2 = data.get("vulnerabilities", [])
+
                 log = self.query_one("#vulns-log")
-                if not vulns:
-                    log.write("[green]No known vulnerabilities found.[/green]")
+                total = len(vulns) + len(vulns2)
+                if total == 0:
+                    log.write("[green]✅ No known vulnerabilities found.[/green]")
                     return
-                log.write(f"[bold red]Found {len(vulns)} potential issues:[/bold red]")
-                for v in vulns:
-                    sev = v.get("severity", "?")
-                    color = "red" if sev == "high" else "yellow"
-                    log.write(f"  [{color}][{sev.upper()}][/{color}] {v.get('description', '?')} @ {v.get('address', '?')}")
+
+                log.write(f"[bold red]Found {total} potential issues:[/bold red]")
+
+                if vulns:
+                    log.write(f"\n[bold]─── Import-based ({len(vulns)}) ───[/bold]")
+                    for v in vulns:
+                        sev = v.get("severity", "?")
+                        color = "red" if sev in ("critical", "high") else "yellow" if sev == "medium" else "dim"
+                        log.write(f"  [{color}][{sev.upper()}][/{color}] {v.get('description', '?')} @ {v.get('address', '?')}")
+
+                if vulns2:
+                    log.write(f"\n[bold]─── String-based ({len(vulns2)}) ───[/bold]")
+                    for v in vulns2:
+                        sev = v.get("severity", "?")
+                        color = "red" if sev in ("critical", "high") else "yellow"
+                        log.write(f"  [{color}][{sev.upper()}][/{color}] {v.get('description', '?')} @ {v.get('offset', '?')}")
+
+                if sus:
+                    log.write(f"\n[bold]─── Suspicious Strings ({len(sus)}) ───[/bold]")
+                    for s in sus[:20]:
+                        log.write(f"  ⚠ {s.get('description', '?')} @ {s.get('offset', '?')}")
+
             except Exception as e:
                 self.query_one("#vulns-log").write(f"[red]Error: {e}[/red]")
 
+    # ═══════════════════════════════════════════════════════════════
+    #  UNPACKER PANEL
+    # ═══════════════════════════════════════════════════════════════
+
+    class UnpackerPanel(Static):
+        def __init__(self, target=None, **kw):
+            super().__init__(**kw)
+            self.target = target
+
+        def compose(self) -> ComposeResult:
+            with Horizontal():
+                yield Button("Unpack", id="unpack-btn", variant="primary")
+                yield Button("Detect Type", id="detect-btn", variant="secondary")
+            yield RichLog(id="unpack-log", auto_scroll=False)
+
+        def on_button_pressed(self, event):
+            if event.button.id == "unpack-btn":
+                self._unpack()
+            elif event.button.id == "detect-btn":
+                self._detect()
+
+        def _detect(self):
+            if not self.target:
+                return
+            try:
+                from panxcz_tools.unpacker import Unpacker
+                u = Unpacker(self.target)
+                ftype = u.detect_type()
+                log = self.query_one("#unpack-log")
+                log.clear()
+                log.write(f"[bold]Detected type:[/bold] [cyan]{ftype}[/cyan]")
+            except Exception as e:
+                self.query_one("#unpack-log").write(f"[red]Error: {e}[/red]")
+
+        def _unpack(self):
+            if not self.target:
+                return
+            log = self.query_one("#unpack-log")
+            log.clear()
+            log.write("[bold]Unpacking...[/bold]")
+            try:
+                from panxcz_tools.unpacker import Unpacker
+                t0 = time.time()
+                u = Unpacker(self.target)
+                result = u.unpack()
+                elapsed = int((time.time() - t0) * 1000)
+
+                log.write(f"[bold green]✅ Unpack complete![/bold green]")
+                log.write(f"  Type:       {result.file_type}")
+                log.write(f"  Files:      {result.file_count}")
+                log.write(f"  Total size: {result.total_size:,} bytes")
+                log.write(f"  Output:     {result.output_dir}")
+                log.write(f"  Time:       {elapsed}ms")
+
+                if result.metadata:
+                    log.write(f"\n[bold]─── Metadata ───[/bold]")
+                    for k, v in result.metadata.items():
+                        if isinstance(v, list) and len(v) > 10:
+                            log.write(f"  {k}: [{len(v)} items] {v[:5]}...")
+                        else:
+                            log.write(f"  {k}: {v}")
+
+                if result.errors:
+                    log.write(f"\n[bold red]Errors:[/bold red]")
+                    for e in result.errors:
+                        log.write(f"  ⚠ {e}")
+
+            except Exception as e:
+                log.write(f"[red]Error: {e}[/red]")
+
+    # ═══════════════════════════════════════════════════════════════
+    #  XREFS PANEL
+    # ═══════════════════════════════════════════════════════════════
+
+    class XRefsPanel(Static):
+        def __init__(self, target=None, **kw):
+            super().__init__(**kw)
+            self.target = target
+
+        def compose(self) -> ComposeResult:
+            with Horizontal():
+                yield Input(placeholder="Address or symbol (e.g. main, printf)", id="xref-addr", expand=True)
+                yield Button("To", id="xref-to-btn", variant="primary")
+                yield Button("From", id="xref-from-btn", variant="secondary")
+            yield RichLog(id="xref-log", auto_scroll=False)
+
+        def on_button_pressed(self, event):
+            addr = self.query_one("#xref-addr").value
+            if not addr:
+                return
+            if event.button.id == "xref-to-btn":
+                self._xrefs_to(addr)
+            elif event.button.id == "xref-from-btn":
+                self._xrefs_from(addr)
+
+        def _xrefs_to(self, addr):
+            try:
+                from panxcz_tools.core.r2_engine import R2Engine
+                engine = R2Engine(self.target)
+                xrefs = engine.xrefs_to(addr)
+                log = self.query_one("#xref-log")
+                log.clear()
+                log.write(f"[bold]Cross-references TO {addr} ({len(xrefs)}):[/bold]")
+                for x in xrefs:
+                    if isinstance(x, dict):
+                        log.write(f"  0x{x.get('from', 0):x} → {x.get('type', '?')} {x.get('name', addr)}")
+            except Exception as e:
+                self.query_one("#xref-log").write(f"[red]Error: {e}[/red]")
+
+        def _xrefs_from(self, addr):
+            try:
+                from panxcz_tools.core.r2_engine import R2Engine
+                engine = R2Engine(self.target)
+                xrefs = engine.xrefs_from(addr)
+                log = self.query_one("#xref-log")
+                log.clear()
+                log.write(f"[bold]Cross-references FROM {addr} ({len(xrefs)}):[/bold]")
+                for x in xrefs:
+                    if isinstance(x, dict):
+                        log.write(f"  {addr} → 0x{x.get('to', 0):x} ({x.get('type', '?')})")
+            except Exception as e:
+                self.query_one("#xref-log").write(f"[red]Error: {e}[/red]")
+
+    # ═══════════════════════════════════════════════════════════════
+    #  TERMINAL PANEL
+    # ═══════════════════════════════════════════════════════════════
+
     class TerminalPanel(Static):
-        """Direct r2 command terminal."""
         def __init__(self, target=None, **kw):
             super().__init__(**kw)
             self.target = target
@@ -317,25 +726,51 @@ if HAS_TEXTUAL:
                 output = self._engine.r2cmd(cmd_text)
                 log = self.query_one("#r2-log")
                 log.write(f"[dim]$ {cmd_text}[/dim]")
-                log.write(output)
+                if output.strip():
+                    log.write(output)
             except Exception as e:
                 self.query_one("#r2-log").write(f"[red]Error: {e}[/red]")
 
+    # ═══════════════════════════════════════════════════════════════
+    #  MAIN APP
+    # ═══════════════════════════════════════════════════════════════
+
     class R2OFRAKApp(App):
-        """Panxcz Tools TUI — Full-featured reverse engineering interface."""
+        """Panxcz Tools TUI — 14-panel reverse engineering interface."""
 
         CSS = """
-        Screen { background: $surface }
-        #sidebar { width: 22; dock: left; background: $surface-darken-1; padding: 1; }
-        #sidebar Button { width: 100%; margin: 1 0; }
+        Screen { background: $surface; }
+        #sidebar {
+            width: 24;
+            dock: left;
+            background: $surface-darken-1;
+            padding: 1;
+            overflow-y: auto;
+        }
+        #sidebar Button {
+            width: 100%;
+            margin: 0 0 1 0;
+            text-align: left;
+        }
+        #sidebar Button.selected {
+            background: $primary-background-lighten-1;
+            text-style: bold;
+            border-left: tall $primary;
+        }
         #content { height: 1fr; }
-        #status-bar { height: 1; dock: bottom; background: $primary-background-lighten-2; padding: 0 1; }
+        #target-info {
+            dock: bottom;
+            padding: 1;
+            background: $surface-darken-2;
+            color: $text-muted;
+            text-style: italic;
+        }
+        .hidden { display: none; }
         DataTable { height: 1fr; }
         RichLog { height: 1fr; }
         Input { margin: 0 0 0 0; }
         Button { margin: 0 1; }
-        .hidden { display: none; }
-        Button.selected { background: $primary-background-lighten-1; text-style: bold; }
+        Horizontal { height: auto; }
         """
 
         BINDINGS = [
@@ -343,14 +778,37 @@ if HAS_TEXTUAL:
             Binding("f2", "show_tab('disasm')", "Disasm"),
             Binding("f3", "show_tab('strings')", "Strings"),
             Binding("f4", "show_tab('imports')", "Imports"),
-            Binding("f5", "show_tab('hex')", "Hex"),
-            Binding("f6", "show_tab('security')", "Security"),
-            Binding("f7", "show_tab('vulns')", "Vulns"),
-            Binding("f8", "show_tab('terminal')", "Terminal"),
+            Binding("f5", "show_tab('exports')", "Exports"),
+            Binding("f6", "show_tab('functions')", "Functions"),
+            Binding("f7", "show_tab('segments')", "Segments"),
+            Binding("f8", "show_tab('hex')", "Hex"),
+            Binding("f9", "show_tab('patches')", "Patches"),
+            Binding("f10", "show_tab('security')", "Security"),
+            Binding("f11", "show_tab('vulns')", "Vulns"),
+            Binding("f12", "show_tab('unpacker')", "Unpack"),
+            Binding("ctrl+x", "show_tab('xrefs')", "XRefs"),
+            Binding("ctrl+t", "show_tab('terminal')", "Terminal"),
             Binding("ctrl+q", "quit", "Quit"),
         ]
 
         TITLE = "Panxcz Tools"
+
+        TABS = [
+            ("overview", "📁 Overview", "F1"),
+            ("disasm", "🔍 Disasm", "F2"),
+            ("strings", "📝 Strings", "F3"),
+            ("imports", "📥 Imports", "F4"),
+            ("exports", "📤 Exports", "F5"),
+            ("functions", "⚡ Functions", "F6"),
+            ("segments", "📦 Segments", "F7"),
+            ("hex", "🔢 Hex", "F8"),
+            ("patches", "🩹 Patches", "F9"),
+            ("security", "🛡️ Security", "F10"),
+            ("vulns", "⚠️ Vulns", "F11"),
+            ("unpacker", "📂 Unpack", "F12"),
+            ("xrefs", "🔗 XRefs", "C-X"),
+            ("terminal", "💻 Terminal", "C-T"),
+        ]
 
         def __init__(self, target=None, output_dir=None, **kw):
             super().__init__(**kw)
@@ -362,55 +820,49 @@ if HAS_TEXTUAL:
             yield Header()
             with Horizontal(id="main-layout"):
                 with Vertical(id="sidebar"):
-                    yield Button("📁 Overview", id="btn-overview", variant="primary")
-                    yield Button("🔍 Disasm", id="btn-disasm")
-                    yield Button("📝 Strings", id="btn-strings")
-                    yield Button("📥 Imports", id="btn-imports")
-                    yield Button("🔢 Hex", id="btn-hex")
-                    yield Button("🛡️ Security", id="btn-security")
-                    yield Button("⚠️ Vulns", id="btn-vulns")
-                    yield Button("💻 Terminal", id="btn-terminal")
-                    yield Static(f"\n[target]\n{self.target or 'None'}", id="target-info")
+                    for tab_id, label, key in self.TABS:
+                        yield Button(f"{label} [{key}]", id=f"btn-{tab_id}")
+                    yield Static(
+                        f"\n[dim]Target:[/dim]\n{self.target or 'None'}",
+                        id="target-info",
+                    )
                 with Vertical(id="content"):
                     yield OverviewPanel(target=self.target, id="panel-overview")
                     yield DisasmPanel(target=self.target, id="panel-disasm", classes="hidden")
                     yield StringsPanel(target=self.target, id="panel-strings", classes="hidden")
                     yield ImportsPanel(target=self.target, id="panel-imports", classes="hidden")
+                    yield ExportsPanel(target=self.target, id="panel-exports", classes="hidden")
+                    yield FunctionsPanel(target=self.target, id="panel-functions", classes="hidden")
+                    yield SegmentsPanel(target=self.target, id="panel-segments", classes="hidden")
                     yield HexPanel(target=self.target, id="panel-hex", classes="hidden")
+                    yield PatchesPanel(target=self.target, id="panel-patches", classes="hidden")
                     yield SecurityPanel(target=self.target, id="panel-security", classes="hidden")
                     yield VulnsPanel(target=self.target, id="panel-vulns", classes="hidden")
+                    yield UnpackerPanel(target=self.target, id="panel-unpacker", classes="hidden")
+                    yield XRefsPanel(target=self.target, id="panel-xrefs", classes="hidden")
                     yield TerminalPanel(target=self.target, id="panel-terminal", classes="hidden")
             yield Footer()
 
         def on_button_pressed(self, event):
-            panel_map = {
-                "btn-overview": "overview",
-                "btn-disasm": "disasm",
-                "btn-strings": "strings",
-                "btn-imports": "imports",
-                "btn-hex": "hex",
-                "btn-security": "security",
-                "btn-vulns": "vulns",
-                "btn-terminal": "terminal",
-            }
-            if event.button.id in panel_map:
-                self.action_show_tab(panel_map[event.button.id])
+            if event.button.id.startswith("btn-"):
+                tab_id = event.button.id[4:]
+                self.action_show_tab(tab_id)
 
         def action_show_tab(self, tab_name: str):
             self._current_panel = tab_name
-            panels = [
-                "overview", "disasm", "strings", "imports",
-                "hex", "security", "vulns", "terminal",
-            ]
-            for p in panels:
-                widget = self.query(f"#panel-{p}")
+            tab_ids = [t[0] for t in self.TABS]
+            for tid in tab_ids:
+                widget = self.query(f"#panel-{tid}")
+                btn = self.query(f"#btn-{tid}")
                 if widget:
-                    if p == tab_name:
+                    if tid == tab_name:
                         widget.remove_class("hidden")
-                        self.query(f"#btn-{p}").add_class("selected")
+                        if btn:
+                            btn.add_class("selected")
                     else:
                         widget.add_class("hidden")
-                        self.query(f"#btn-{p}").remove_class("selected")
+                        if btn:
+                            btn.remove_class("selected")
 
 
 def main():
