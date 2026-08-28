@@ -94,3 +94,13 @@ cp "/tmp/${PKG_NAME}_${DEB_VERSION}_all.deb" "$REPO_DIR/" 2>/dev/null || true
 
 ls -lh "/tmp/${PKG_NAME}_${DEB_VERSION}_all.deb"
 echo "[+] Termux .deb (all arch) built!"
+
+# GUI wrapper
+cat > "$STAGE$PREFIX/bin/panxcz-gui" << WRAPPER
+#!/data/data/com.termux/files/usr/bin/env python3
+import sys, os
+sys.path.insert(0, '${PY_SITE}')
+from panxcz_tools.gui.app import main
+main()
+WRAPPER
+chmod 755 "$STAGE$PREFIX/bin/panxcz-gui"

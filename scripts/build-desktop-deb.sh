@@ -72,7 +72,7 @@ if [ ! -d "$STAGE/usr/lib/python3/dist-packages/panxcz-tools" ]; then
 fi
 
 # Wrapper scripts
-cat > "$STAGE/usr/bin/panxcz-tools" << 'W'
+cat > "$STAGE/usr/bin/panxcz" << 'W'
 #!/usr/bin/env python3
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib/python3/dist-packages"))
@@ -81,7 +81,7 @@ main()
 W
 chmod 755 "$STAGE/usr/bin/panxcz-tools"
 
-cat > "$STAGE/usr/bin/panxcz-tools-tui" << 'W'
+cat > "$STAGE/usr/bin/panxcz-tui" << 'W'
 #!/usr/bin/env python3
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib/python3/dist-packages"))
@@ -113,3 +113,13 @@ fakeroot dpkg-deb --build "$STAGE" "${PKG_NAME}_${DEB_VERSION}_${ARCH}.deb" 2>/d
 
 ls -lh "$REPO_DIR/${PKG_NAME}_${DEB_VERSION}_${ARCH}.deb"
 echo "[+] Desktop .deb built!"
+
+# GUI wrapper
+cat > "$STAGE/usr/bin/panxcz-gui" << 'W'
+#!/usr/bin/env python3
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib/python3/dist-packages"))
+from panxcz_tools.gui.app import main
+main()
+W
+chmod 755 "$STAGE/usr/bin/panxcz-gui"
