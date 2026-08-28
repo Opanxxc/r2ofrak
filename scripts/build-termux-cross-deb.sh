@@ -50,16 +50,18 @@ main()
 WRAPPER
 chmod 755 "$STAGE$PREFIX/bin/panxcz-tools-tui"
 
-# ── 4. Install deps via postinst ─────────────────────────────────
+# ── 4. postinst (NO apt calls — deadlock!) ──────────────────────
+# NOTE: Do NOT call apt/pkg inside postinst — the parent apt install
+# holds the dpkg lock and any nested apt call will deadlock.
+# Dependencies are handled by the Depends: field in control.
 cat > "$STAGE/DEBIAN/postinst" << 'POSTINST'
 #!/data/data/com.termux/files/usr/bin/env bash
-echo "[*] Installing R2OFRAK dependencies..."
-export TERMUX_PKG_NO_MIRROR_PICKER=1
-yes | pkg update 2>/dev/null || true
-pkg install -y python python-pip radare2 2>/dev/null || \
-    apt-get install -y python python-pip radare2 2>/dev/null || true
-pip install --no-cache-dir textual rich r2pipe 2>/dev/null || true
-echo "[+] R2OFRAK installed! Run: panxcz-tools-tui"
+echo "[*] Setting up panxcz-tools..."
+# Only pip install Python-only deps (no apt lock conflict)
+pip install --no-cache-dir textual rich r2pipe 2>/dev/null || \
+    pip3 install --no-cache-dir textual rich r2pipe 2>/dev/null || true
+echo "[+] panxcz-tools ready!"
+echo "    Run: panxcz-tools-tui <binary>"
 POSTINST
 chmod 755 "$STAGE/DEBIAN/postinst"
 
@@ -71,7 +73,7 @@ Section: devel
 Priority: optional
 Architecture: all
 Maintainer: Opanxxc <opanxxc@users.noreply.github.com>
-Depends: python (>= 3.9), radare2
+Depends: python (>= 3.9), python-pip, radare2
 Homepage: https://github.com/Opanxxc/panxcz-tools
 Description: R2OFRAK - Unified Reverse Engineering for Termux
  Combines radare2 + OFRAK into one tool for Android/Termux.
